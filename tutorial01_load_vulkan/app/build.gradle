@@ -1,0 +1,61 @@
+apply plugin: 'com.android.model.application'
+
+model {
+    android {
+        compileSdkVersion = "android-N"
+        buildToolsVersion = "23.0.2"
+
+        defaultConfig {
+            applicationId = "com.google.vulkan.tutorials.one"
+            minSdkVersion.apiLevel = 22
+            targetSdkVersion.apiLevel = 24
+            versionCode = 1
+            versionName = "0.0.1"
+        }
+        ndk {
+            moduleName = "vktuts"
+            toolchain = "clang"
+            stl = "gnustl_static"
+            ldLibs.addAll(["log", "android"])
+            cppFlags.addAll(["-Werror", "-std=c++11",
+                             "-D VK_USE_PLATFORM_ANDROID_KHR"])
+            cppFlags.addAll("-I" + file("src/main/jni"))
+            abiFilters.addAll(["armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'])
+
+        }
+        // Turn on hard float support in armeabi-v7a
+        abis {
+            create("armeabi-v7a") {
+                cppFlags.addAll(["-mhard-float", "-D_NDK_MATH_NO_SOFTFP=1", "-mfloat-abi=hard"])
+                ldLibs.add("m_hard")
+                ldFlags.add("-Wl,--no-warn-mismatch")
+            }
+        }
+
+        sources {
+            main {
+                jni {
+                    dependencies {
+                        project ":nativeactivity" linkage "static"
+                    }
+                    source {
+                    }
+                }
+            }
+        }
+        buildTypes {
+            release {
+                ndk.with {
+                    debuggable = true
+                }
+                minifyEnabled = false
+                proguardFiles.add(file('proguard-rules.pro'))
+            }
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile project(':nativeactivity')
+}
