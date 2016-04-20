@@ -1,6 +1,6 @@
 Tutorial Samples
 ================
-A set of samples to illustrate Vulkan API on Android
+A set of samples to illustrate Vulkan API on Android		
 Note: to build on windows, please use branch "build-windows" from this repo to temporarily workaround windows clang problem
 
 Pre-requisites
