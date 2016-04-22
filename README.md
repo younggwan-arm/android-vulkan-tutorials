@@ -1,7 +1,14 @@
 Tutorial Samples
 ================
-A set of samples to illustrate Vulkan API on Android		
+A set of samples to illustrate Vulkan API on Android with Android Studio		
 Note: to build on windows, please use branch "build-windows" from this repo to temporarily workaround windows clang problem
+
+Other Resources:	
+Additional Android Studio/NDK samples:    
+- [Android Vulkan API Basic Samples](https://github.com/googlesamples/vulkan-basic-samples)
+- [Google Play Game Samples](https://github.com/playgameservices/cpp-android-basic-samples)
+- [Google Android NDK Samples](https://github.com/googlesamples/android-ndk)
+
 
 Pre-requisites
 --------------
