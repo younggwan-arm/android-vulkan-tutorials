@@ -1,7 +1,7 @@
 Tutorial Samples
 ================
 A set of samples to illustrate Vulkan API on Android with Android Studio		
-To build on windows for tutorial02, copy/install ndk-r12 ( or better ) to a directory close to root dir ( c: ) to workaround command path 260 character limit issue;see totorial02's build.gradle for details
+To build on windows for tutorial02/03, copy/install ndk-r12 ( or better ) to a directory close to root dir ( c: ) to workaround command path 260 character limit issue;see totorial02/03's build.gradle for details
 
 Other Resources:	
 Additional Android Studio/NDK samples:    

@@ -50,6 +50,10 @@ model {
                         srcDir '../../common/vulkan_wrapper'
                     }
                 }
+                // To build on windows, must shorten the source directly path
+                // one way is to copy your ndk to c:\ directory [c:\ndk-r12], and confogure new location to ndk.dir in local.properties
+                // the other way is to just copy layers source out from ndk\sources\third_party\vulkan to c:\vulkan.
+                // Linux / Mac build should work as without any changes
                 jniLibs {
                     dependencies {
                         project ":threading"
