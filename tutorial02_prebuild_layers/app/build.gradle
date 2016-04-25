@@ -1,3 +1,4 @@
+import org.apache.tools.ant.taskdefs.condition.Os
 apply plugin: 'com.android.model.application'
 
 Properties properties = new Properties()
@@ -65,15 +66,19 @@ model {
     }
 }
 // ******** Adding validation layers into build *******
-// Build layers if necessary
-//    to build on windows(*), use "${ndkDir}/ndk-build.cmd" instead
+// Build layers if necessary: works for non-windows Host
+// For windows host, a couple extra steps must be done before build this project
+//   ndk-r12 ( or better ) command path exceed 260 character limit:
+//       to workaround it, copy your ndk to a place with shorter path like
+//           c:\ndk-r12
+//       and point your local.properties file's ndk.dir to the new location
+def ndkBuildCmd = "${ndkDir}/ndk-build"
+if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+    ndkBuildCmd = "${ndkDir}/ndk-build.cmd"
+}
 task(buildLayers, type : Exec) {
     workingDir(valLayerSrc + "/build-android")
-    if(!file("${valLayerSrc}/build-android/libs").exists()) {
-        commandLine "${ndkDir}/ndk-build", "NDK_PROJECT_PATH=.", "-j", "8"
-    } else {
-        commandLine 'echo', 'Validation layer is already up to date'
-    }
+    commandLine "${ndkBuildCmd}", 'NDK_PROJECT_PATH=.', '-j', '8'
 }
 
 // Copy the validation layers
