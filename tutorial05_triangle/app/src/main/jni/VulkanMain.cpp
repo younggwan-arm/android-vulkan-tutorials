@@ -683,19 +683,20 @@ bool InitVulkan(android_app* app) {
   // In our case we need 2 command as we have 2 framebuffer
   render.cmdBufferLen_ = swapchain.swapchainLength_;
   render.cmdBuffer_ = new VkCommandBuffer[swapchain.swapchainLength_];
+  VkCommandBufferAllocateInfo cmdBufferCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .commandPool = render.cmdPool_,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = render.cmdBufferLen_,
+  };
+  CALL_VK(vkAllocateCommandBuffers(device.device_,
+                  &cmdBufferCreateInfo,
+                  render.cmdBuffer_));
+
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     // We start by creating and declare the "beginning" our command buffer
-    VkCommandBufferAllocateInfo cmdBufferCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .commandPool = render.cmdPool_,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = render.cmdBufferLen_,
-    };
-    CALL_VK(vkAllocateCommandBuffers(device.device_, &cmdBufferCreateInfo,
-                                   &render.cmdBuffer_[bufferIndex]));
-
     VkCommandBufferBeginInfo cmdBufferBeginInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = nullptr,
