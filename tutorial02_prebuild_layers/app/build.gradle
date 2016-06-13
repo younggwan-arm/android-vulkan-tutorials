@@ -43,6 +43,10 @@ model {
                         srcDir '../../common/vulkan_wrapper'
                     }
                 }
+                jniLibs {
+                    // Must have ndk-r12 or better which including layer binaries
+                    source.srcDir "${valLayerSrc}/build-android/jniLibs"
+                }
             }
         }
         buildTypes {
@@ -54,34 +58,6 @@ model {
                 proguardFiles.add(file('proguard-rules.pro'))
             }
         }
-    }
-}
-// ******** Adding validation layers into build *******
-// Build layers if necessary: works for non-windows Host
-// For windows host, a couple extra steps must be done before build this project
-//   ndk-r12 ( or better ) command path exceed 260 character limit:
-//       to workaround it, copy your ndk to a place with shorter path like
-//           c:\ndk-r12
-//       and point your local.properties file's ndk.dir to the new location
-def ndkBuildCmd = "${ndkDir}/ndk-build"
-if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-    ndkBuildCmd = "${ndkDir}/ndk-build.cmd"
-}
-task(buildLayers, type : Exec) {
-    workingDir(valLayerSrc + "/build-android")
-    commandLine "${ndkBuildCmd}", 'NDK_PROJECT_PATH=.', '-j', '8'
-}
-
-// Copy the validation layers
-task(copyValidationLayers, type: Copy) {
-    from "${valLayerSrc}/build-android/libs"
-    into 'src/main/jniLibs'
-}
-
-tasks.whenTaskAdded { task ->
-    if (task.name.contains('compile')) {
-        task.dependsOn buildLayers
-        task.dependsOn copyValidationLayers
     }
 }
 
