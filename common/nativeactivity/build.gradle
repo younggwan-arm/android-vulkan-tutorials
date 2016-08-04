@@ -6,8 +6,8 @@ def ndkDir = properties.getProperty('ndk.dir')
 
 model {
     android {
-        compileSdkVersion = "android-N"
-        buildToolsVersion = "23.0.2"
+        compileSdkVersion 24
+        buildToolsVersion "24.0.0"
         defaultConfig.with {
             minSdkVersion.apiLevel = 9
             targetSdkVersion.apiLevel = 24
