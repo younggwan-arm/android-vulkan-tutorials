@@ -1,0 +1,69 @@
+apply plugin: 'com.android.library'
+
+// Both cmake and ndkbuild are simple, pick one and feel free to remove the
+// other one. This code is tested against Android Studio 2.2 Beta + NDK-12
+// [Android Studio 2.2.0-beta1 + NDK-r13-beta1 + SDK_cmake_3.6 does not work]
+// control to switch:
+// USE_CMAKE = 0 :  use ndkbuild plugin to build layers
+// USE_CMAKE = 1 :  use cmake plugin to build layers
+def USE_CMAKE = 1
+
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.1"
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 24
+        versionCode 1
+        versionName "1.0"
+        externalNativeBuild {
+            if (USE_CMAKE) {
+                cmake {
+                    abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64', 'mips'
+                    arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=gnustl_static'
+                    if (System.properties['os.name'].toLowerCase().contains('windows')) {
+                        // On windows, have to use gcc to build layers
+                        arguments '-DANDROID_TOOLCHAIN=gcc'
+                    }
+                }
+            } else {
+                ndkBuild {
+                    abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64', 'mips'
+                }
+            }
+        }
+    }
+    externalNativeBuild {
+        if (USE_CMAKE) {
+            cmake {
+                path 'CMakeLists.txt'
+            }
+        } else {
+            ndkBuild {
+                // Make sure NDK_TOOLCHAIN_VERSION & APP_STL are set to the same one
+                // as app module
+                Properties properties = new Properties()
+                properties.load(project.rootProject.file('local.properties').newDataInputStream())
+                def ndkDir = properties.getProperty('ndk.dir')
+
+                path "${ndkDir}/sources/third_party/vulkan/src/build-android/jni/Android.mk"
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:24.1.1'
+    testCompile 'junit:junit:4.12'
+}

@@ -1,2 +1,1 @@
-include ':app', ':nativeactivity'
-project(':nativeactivity').projectDir = new File(settingsDir, '../common/nativeactivity')
+include ':app'

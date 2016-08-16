@@ -1,54 +1,35 @@
-apply plugin: 'com.android.model.application'
+apply plugin: 'com.android.application'
 
-model {
-    android {
-        compileSdkVersion 24
-        buildToolsVersion "24.0.0"
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.0"
 
-        defaultConfig {
-            applicationId = "com.google.vulkan.tutorials.four"
-            minSdkVersion.apiLevel = 22
-            targetSdkVersion.apiLevel = 24
-            versionCode = 1
-            versionName = "0.0.1"
-        }
-        ndk {
-            moduleName = "vktuts"
-            toolchain = "clang"
-            stl = "gnustl_static"
-            ldLibs.addAll(["log", "android"])
-            cppFlags.addAll(["-Werror", "-std=c++11",
-                             "-D VK_USE_PLATFORM_ANDROID_KHR"])
-            cppFlags.addAll(["-I" + file("../../common/vulkan_wrapper")])
-            abiFilters.addAll(["armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'])
-
-        }
-        sources {
-            main {
-                jni {
-                    dependencies {
-                        project ":nativeactivity" linkage "static"
-                    }
-                    source {
-                        srcDir 'src/main/jni'
-                        srcDir '../../common/vulkan_wrapper'
-                    }
-                }
+    defaultConfig {
+        applicationId  "com.google.vulkan.tutorials.four"
+        minSdkVersion     24
+        targetSdkVersion  24
+        versionCode  1
+        versionName  "0.0.1"
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=gnustl_static'
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
             }
         }
-        buildTypes {
-            release {
-                ndk.with {
-                    debuggable = true
-                }
-                minifyEnabled = false
-                proguardFiles.add(file('proguard-rules.pro'))
-            }
+    }
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
 }
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':nativeactivity')
 }
