@@ -1,77 +1,49 @@
-apply plugin: 'com.android.model.application'
+apply plugin: 'com.android.application'
 
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 def ndkDir = properties.getProperty('ndk.dir')
 
-model {
-    android {
+android {
         compileSdkVersion 24
         buildToolsVersion "24.0.0"
 
         defaultConfig {
-            applicationId = "com.google.vulkan.tutorials.three"
-            minSdkVersion.apiLevel = 22
-            targetSdkVersion.apiLevel = 24
+            applicationId "com.google.vulkan.tutorials.three"
+            minSdkVersion    24
+            targetSdkVersion 24
             versionCode = 1
             versionName = "0.0.1"
-        }
-        ndk {
-            moduleName = "vktuts"
-            toolchain = "clang"
-            stl = "gnustl_static"
-            ldLibs.addAll(["log", "android"])
-            cppFlags.addAll(["-Werror", "-std=c++11",
-                             "-DUSE_DEBUG_EXTENTIONS",
-                             "-D VK_USE_PLATFORM_ANDROID_KHR"])
-            cppFlags.addAll(["-I" + file("src/main/jni"),
-                             "-I" + "${ndkDir}/sources/third_party/vulkan/src/include",
-                             "-I" + file("../../common/vulkan_wrapper")])
-
-            abiFilters.addAll(["armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'])
-
-        }
-        sources {
-            main {
-                jni {
-                    dependencies {
-                        project ":nativeactivity" linkage "static"
-                    }
-                    source {
-                        srcDir '../../common/vulkan_wrapper'
-                    }
-                }
-                // To build on windows, must shorten the source directly path
-                // one way is to copy your ndk to c:\ directory [c:\ndk-r12], and confogure new location to ndk.dir in local.properties
-                // the other way is to just copy layers source out from ndk\sources\third_party\vulkan to c:\vulkan.
-                // Linux / Mac build should work as without any changes
-                jniLibs {
-                    dependencies {
-                        project ":threading"
-                        project ":parameter_validation"
-                        project ":object_tracker"
-                        project ":core_validation"
-                        project ":device_limits"
-                        project ":image"
-                        project ":swapchain"
-                        project ":unique_objects"
-                    }
+            externalNativeBuild {
+                cmake {
+                    abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                    arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=gnustl_static'
                 }
             }
+        }
+
+        externalNativeBuild {
+            cmake {
+                path 'CMakeLists.txt'
+            }
+        }
+
+        sourceSets {
+            main {
+                dependencies {
+                    project ':layerlib'
+                }
+            }
+
         }
         buildTypes {
             release {
-                ndk.with {
-                    debuggable = true
-                }
                 minifyEnabled = false
-                proguardFiles.add(file('proguard-rules.pro'))
+                proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
             }
         }
-    }
 }
-
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':nativeactivity')
+    compile project(':layerlib')
 }

@@ -1,67 +1,50 @@
-import org.apache.tools.ant.taskdefs.condition.Os
-apply plugin: 'com.android.model.application'
+apply plugin: 'com.android.application'
 
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 def ndkDir = properties.getProperty('ndk.dir')
-def valLayerSrc = "${ndkDir}/sources/third_party/vulkan/src"
+def valLayerBinDir = "${ndkDir}/sources/third_party/vulkan/src/build-android/jniLibs"
 
-model {
-    android {
-        compileSdkVersion 24
-        buildToolsVersion "24.0.0"
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.1"
 
-        defaultConfig {
-            applicationId = "com.vulkan.tutorials.two"
-            minSdkVersion.apiLevel = 22
-            targetSdkVersion.apiLevel = 24
-            versionCode = 1
-            versionName = "0.0.1"
-        }
-        ndk {
-            moduleName = "vktuts"
-            toolchain = "clang"
-            stl = "gnustl_static"
-            ldLibs.addAll(["log", "android"])
-            cppFlags.addAll(["-Werror", "-std=c++11",
-                             "-DUSE_DEBUG_EXTENTIONS",
-                             "-D VK_USE_PLATFORM_ANDROID_KHR"])
-            cppFlags.addAll(["-I" + file("src/main/jni"),
-                             "-I" + "${valLayerSrc}/include",
-                             "-I" + file("../../common/vulkan_wrapper")])
-
-            abiFilters.addAll(["armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'])
-
-        }
-        sources {
-            main {
-                jni {
-                    dependencies {
-                        project ":nativeactivity" linkage "static"
-                    }
-                    source {
-                        srcDir '../../common/vulkan_wrapper'
-                    }
-                }
-                jniLibs {
-                    // Must have ndk-r12 or better which including layer binaries
-                    source.srcDir "${valLayerSrc}/build-android/jniLibs"
-                }
-            }
-        }
-        buildTypes {
-            release {
-                ndk.with {
-                    debuggable = true
-                }
-                minifyEnabled = false
-                proguardFiles.add(file('proguard-rules.pro'))
+    defaultConfig {
+        applicationId "com.vulkan.tutorials.two"
+        minSdkVersion 24
+        targetSdkVersion 24
+        versionCode = 1
+        versionName = "0.0.1"
+        externalNativeBuild {
+            cmake {
+                abiFilters "armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'
+                arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
             }
         }
     }
+    externalNativeBuild {
+        cmake {
+            path 'src/main/jni/CMakeLists.txt'
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs {
+              // Must have ndk-r12 or better which including layer binaries
+              srcDirs = ["${valLayerBinDir}"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+             minifyEnabled = false
+             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+     }
 }
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':nativeactivity')
 }

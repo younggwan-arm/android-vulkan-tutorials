@@ -1,58 +1,45 @@
-apply plugin: 'com.android.model.application'
+apply plugin: 'com.android.application'
 
-model {
-    android {
-        compileSdkVersion 24
-        buildToolsVersion "24.0.0"
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.0"
 
-        defaultConfig {
-            applicationId = "com.google.vulkan.tutorials.five"
-            minSdkVersion.apiLevel = 22
-            targetSdkVersion.apiLevel = 24
-            versionCode = 1
-            versionName = "0.0.1"
-            // Shader compilation directives, put glsl shaders to app/src/main/shaders
-            // android studio will pick them up and compile them into APK/assets/shaders
-            shaders {
-                glslcArgs.addAll(['-c', '-g'])
+    defaultConfig {
+        applicationId  "com.google.vulkan.tutorials.five"
+        minSdkVersion    24
+        targetSdkVersion 24
+        versionCode 1
+        versionName "0.0.1"
+
+        // Shader compilation directives, put glsl shaders to app/src/main/shaders
+        // android studio will pick them up and compile them into APK/assets/shaders
+        // KNOWN ISSUE:  if shaders having errors, it takes long time for gradle to timeout
+        //               but it will eventually time out and complain about shader compiling
+        shaders {
+            glslcArgs.addAll(['-c', '-g'])
+        }
+        externalNativeBuild {
+            cmake {
+                // armeabi is not supported, not building for mips in samples
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=gnustl_static'
             }
         }
+    }
+   externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+        }
+    }
 
-        ndk {
-            moduleName = "vktuts"
-            toolchain = "clang"
-            stl = "gnustl_static"
-            ldLibs.addAll(["log", "android"])
-            cppFlags.addAll([ "-Werror","-std=c++11",
-                              "-DVK_USE_PLATFORM_ANDROID_KHR"])
-            cppFlags.addAll(["-I" + file("../../common/src"),
-                             "-I" + file("../../common/vulkan_wrapper")])
-            abiFilters.addAll(["armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'])
-        }
-        sources {
-            main {
-                jni {
-                    dependencies {
-                        project ":nativeactivity" linkage "static"
-                    }
-                    source {
-                        srcDir 'src/main/jni'
-                   //     srcDir '../../common/src'
-                        srcDir '../../common/vulkan_wrapper'
-                    }
-                }
-            }
-        }
-        buildTypes {
-            release {
-                minifyEnabled = false
-                proguardFiles.add(file('proguard-rules.pro'))
-            }
+    buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':nativeactivity')
 }

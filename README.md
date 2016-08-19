@@ -1,7 +1,11 @@
 Tutorial Samples
 ================
 A set of samples to illustrate Vulkan API on Android with Android Studio		
-To build on windows for tutorial02/03, copy/install ndk-r12 ( or better ) to a directory close to root dir ( c: ) to workaround command path 260 character limit issue;see totorial02/03's build.gradle for details
+To build on windows for tutorial02/03, copy/install ndk-r12 ( or better ) to a directory close to root dir ( c: ) to workaround command path 260 character limit issue;see totorial02/03's build.gradle for details. To Build samples:
+- Inside Andriod, menu File --> New --> Import Project
+- Find your sample's build.gradle and open it
+This will force andrioid studio to create local.properties file to config your SDK and NDK location; if you see error during importing, open local.properties file and correct the NDK and SDK location, then re-sync.
+
 
 Other Resources:	
 Additional Android Studio/NDK samples:    
@@ -12,17 +16,27 @@ Additional Android Studio/NDK samples:
 
 Pre-requisites
 --------------
-- Android Studio 2.1 preview 6
+- Android N device, API >= 24
+- Android Studio 2.2 beta1 or better
 - Android NDK
     * [NDK-r12](https://github.com/android-ndk/ndk/wiki), compile as is
-    * [NDK-r11](http://developer.android.com/ndk/downloads/index.html) needs shaderc from ndk-r12, and validation layer code from [github](https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers) *android_layers* branch
-    * NDK-R10x and earlier needs shaderc, validation layer source code, and vulkan headers from ndk-r11 --copy headers from NDK-r11 *android-24/your-abi/usr/include/vulkan* to your own include directory
-    * Project build.gradle needs to be modified to compile with ndk version that is NOT R12
+    * SDK with the latest cmake package
+
+Test Matrix
+------------
+| Andrid Studio Version | cmake in SDK| NDK      | Result  |
+|-----------------------|-------------|----------|---------|
+| 2.2.0-beta1           | 3.6.3133135 | NDK-r12  | Yes     |
+| 2.2.0-beta1           | 3.6.3133135 | r13-beta1| NO      |
+
+Known Issue:
+ - r13-beta layer source needed to be updated
+ - Studio Beta cmake 3.6.3133135 having issues with r13-beta
 
 Getting Started
 ---------------
-1. [Download Android Studio](http://developer.android.com/sdk/index.html)
-1. [Download Android NDK-R12](https://github.com/android-ndk/ndk/wiki)
+1. [Download Android Studio](http://tools.android.com/download/studio/canary)
+1. [Download Android NDK-R12+](https://github.com/android-ndk/ndk/wiki)
 1. [Download source code](http://www.github.com/googlesamples/android-vulkan-tutorials)
 1. Launch Android Studio.
 1. "Import Project" of the interested tutorial project to Android Studio
