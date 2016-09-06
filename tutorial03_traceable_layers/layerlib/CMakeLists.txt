@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.4.1)
 
+if(ANDROID_NDK_REVISION GREATER 12)
+  message(FATAL_ERROR "For NDK version 13 and above, please use idk-build support to build")
+endif (ANDROID_NDK_REVISION GREATER 12)
+
 # build layer_utils as a static lib
 set(NDK_SRC_DIR ${ANDROID_NDK}/sources)
 set(SRC_DIR ${NDK_SRC_DIR}/third_party/vulkan/src)
