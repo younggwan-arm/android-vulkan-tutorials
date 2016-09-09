@@ -5,7 +5,7 @@ apply plugin: 'com.android.library'
 // [Android Studio 2.2.0-beta1 + NDK-r13-beta1 + SDK_cmake_3.6 does not work]
 // control to switch:
 // USE_CMAKE = 0 :  use ndkbuild plugin to build layers
-// USE_CMAKE = 1 :  use cmake plugin to build layers, only works for ndk-r12
+// USE_CMAKE = 1 :  use cmake plugin to build layers
 def USE_CMAKE = 0
 
 android {
