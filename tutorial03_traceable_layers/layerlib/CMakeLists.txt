@@ -15,18 +15,18 @@ include_directories(${SRC_DIR}/include
                     ${SRC_DIR}/layers
                     ${SRC_DIR}/loader)
 add_library(layer_utils STATIC
-        ${LAYER_DIR}/common/vk_layer_config.cpp
-        ${LAYER_DIR}/common/vk_layer_extension_utils.cpp
-        ${LAYER_DIR}/common/vk_layer_utils.cpp)
+        ${SRC_DIR}/layers/vk_layer_config.cpp
+        ${SRC_DIR}/layers/vk_layer_extension_utils.cpp
+        ${SRC_DIR}/layers/vk_layer_utils.cpp)
 
 # build core_validation layers which including shader validation
 set(core_validation_SRCS
-        ${LAYER_DIR}/layer-src/core_validation/core_validation.cpp
-        ${LAYER_DIR}/common/vk_layer_table.cpp )
+        ${SRC_DIR}/layers/core_validation.cpp
+        ${SRC_DIR}/layers/vk_layer_table.cpp )
 if(NOT (${ANDROID_NDK_REVISION} LESS 13))
     list(APPEND core_validation_SRCS
-         ${LAYER_DIR}/layer-src/core_validation/descriptor_sets.cpp
-         ${LAYER_DIR}/layer-src/core_validation/vk_safe_struct.cpp)
+         ${SRC_DIR}/layers/descriptor_sets.cpp
+         ${LAYER_DIR}/include/vk_safe_struct.cpp)
 endif(NOT (${ANDROID_NDK_REVISION} LESS 13))
 
 # piggyback on the previous CXX_FLAGS
@@ -79,38 +79,55 @@ endif(NOT (${ANDROID_NDK_REVISION} LESS 13))
 # device_limit layer is for ndk-r12 only, NDK-R13 merged it into core_validation
 if(${ANDROID_NDK_REVISION} LESS 13)
 add_library(VkLayer_device_limits SHARED
-            ${LAYER_DIR}/layer-src/device_limits/device_limits.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${SRC_DIR}/layers/device_limits.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
 target_link_libraries(VkLayer_device_limits log android layer_utils)
 endif(${ANDROID_NDK_REVISION} LESS 13)
 
 add_library(VkLayer_image SHARED
-            ${LAYER_DIR}/layer-src/image/image.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${SRC_DIR}/layers/image.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
 target_link_libraries(VkLayer_image log android layer_utils)
 
 add_library(VkLayer_parameter_validation SHARED
-            ${LAYER_DIR}/layer-src/parameter_validation/parameter_validation.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${SRC_DIR}/layers/parameter_validation.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
 target_link_libraries(VkLayer_parameter_validation log android layer_utils)
 
-add_library(VkLayer_object_tracker SHARED
-            ${LAYER_DIR}/layer-src/object_tracker/object_tracker.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+# directory structure changed in ndk-13, object_tracker.cpp is from src/layers
+if(${ANDROID_NDK_REVISION} LESS 13)
+    set(object_tracker_SRCS
+             ${LAYER_DIR}/layer-src/object_tracker/object_tracker.cpp
+             ${SRC_DIR}/layers/vk_layer_table.cpp)
+
+else(${ANDROID_NDK_REVISION} LESS 13)
+    set(object_tracker_SRCS
+            ${SRC_DIR}/layers/object_tracker.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
+endif(${ANDROID_NDK_REVISION} LESS 13)
+add_library(VkLayer_object_tracker SHARED ${object_tracker_SRCS})
 target_link_libraries(VkLayer_object_tracker log android layer_utils)
 
 add_library(VkLayer_threading SHARED
-            ${LAYER_DIR}/layer-src/threading/threading.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${SRC_DIR}/layers/threading.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
 target_link_libraries(VkLayer_threading log android layer_utils)
 
-add_library(VkLayer_unique_objects SHARED
+# src dir structure changed in ndk-r13, unique_objects.cpp is under include/
+if(${ANDROID_NDK_REVISION} LESS 13)
+    set(unique_objects_SRCS
             ${LAYER_DIR}/layer-src/unique_objects/unique_objects.cpp
-            ${LAYER_DIR}/layer-src/unique_objects/vk_safe_struct.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${LAYER_DIR}/layer-src/unique_objects/vk_safe_struct.cpp)
+else(${ANDROID_NDK_REVISION} LESS 13 )
+    set(unique_objects_SRCS
+            ${LAYER_DIR}/include/unique_objects.cpp
+            ${LAYER_DIR}/include/vk_safe_struct.cpp)
+endif(${ANDROID_NDK_REVISION} LESS 13 )
+list(APPEND unique_objects_SRCS ${SRC_DIR}/layers/vk_layer_table.cpp)
+add_library(VkLayer_unique_objects SHARED  ${unique_objects_SRCS})
 target_link_libraries(VkLayer_unique_objects log android layer_utils)
 
 add_library(VkLayer_swapchain SHARED
-            ${LAYER_DIR}/layer-src/swapchain/swapchain.cpp
-            ${LAYER_DIR}/common/vk_layer_table.cpp)
+            ${SRC_DIR}/layers/swapchain.cpp
+            ${SRC_DIR}/layers/vk_layer_table.cpp)
 target_link_libraries(VkLayer_swapchain log android layer_utils)

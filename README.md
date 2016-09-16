@@ -54,7 +54,8 @@ Tutorial List
 1. tutorial02_prebuilt_layers
     - create a vulkan device with vulkan validation layers
 1. tutorial03_traceable_layers
-    - create a vulkan device with validation layers that could debug into
+    - create a vulkan device with validation layers that could be traced.
+      Refer to README.md under its directory
 1. tutorial04_first_window
     - create a vulkan window with WSI 
 1. tutorial05_triangle
