@@ -118,9 +118,13 @@ if(${ANDROID_NDK_REVISION} LESS 13)
     set(unique_objects_SRCS
             ${LAYER_DIR}/layer-src/unique_objects/unique_objects.cpp
             ${LAYER_DIR}/layer-src/unique_objects/vk_safe_struct.cpp)
-else(${ANDROID_NDK_REVISION} LESS 13 )
+elseif (${ANDROID_NDK_REVISION} LESS 14 )
     set(unique_objects_SRCS
             ${LAYER_DIR}/include/unique_objects.cpp
+            ${LAYER_DIR}/include/vk_safe_struct.cpp)
+else()
+    set(unique_objects_SRCS
+            ${SRC_DIR}/layers/unique_objects.cpp
             ${LAYER_DIR}/include/vk_safe_struct.cpp)
 endif(${ANDROID_NDK_REVISION} LESS 13 )
 list(APPEND unique_objects_SRCS ${SRC_DIR}/layers/vk_layer_table.cpp)
