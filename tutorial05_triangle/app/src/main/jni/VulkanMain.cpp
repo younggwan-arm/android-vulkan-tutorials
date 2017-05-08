@@ -808,11 +808,14 @@ bool VulkanDrawFrame(void) {
                               UINT64_MAX, render.semaphore_,
                               VK_NULL_HANDLE, &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
+
+  VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = nullptr,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &render.semaphore_,
+        .pWaitDstStageMask = &waitStageMask,
         .commandBufferCount = 1,
         .pCommandBuffers = &render.cmdBuffer_[nextIndex],
         .signalSemaphoreCount = 0,
