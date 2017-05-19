@@ -16,6 +16,7 @@ set(THIRD_PARTY_DIR ${REPO_ROOT_DIR}/third_party)
 add_library(vktuts SHARED
    ${SRC_DIR}/VulkanMain.cpp
    ${SRC_DIR}/AndroidMain.cpp
+   ${SRC_DIR}/CreateShaderModule.cpp
    ${COMMON_DIR}/vulkan_wrapper/vulkan_wrapper.cpp)
 
 target_include_directories(vktuts PRIVATE
