@@ -13,6 +13,23 @@ Additional Android Studio/NDK samples:
 - [Google Play Game Samples](https://github.com/playgameservices/cpp-android-basic-samples)
 - [Google Android NDK Samples](https://github.com/googlesamples/android-ndk)
 
+Contents
+-------------
+1. tutorial01_load_vulkan
+- create a vulkan device
+1. tutorial02_prebuilt_layers
+- create a vulkan device with vulkan validation layers
+1. tutorial03_traceable_layers
+- create a vulkan device with validation layers that could be traced.
+Refer to README.md under its directory
+1. tutorial04_first_window
+- create a vulkan window with WSI 
+1. tutorial05_triangle
+- draw a simple triangle with Android Studio integrated shaderc feature
+1. tutorial06_texture
+- draw textured triangle with [CDep](https://github.com/google/cdep) packed shaderc pre-built binary
+- glsl shaders are compiled at app run time (similar to openGL traditional shader compiling model)
+
 
 Pre-requisites
 --------------
@@ -45,21 +62,6 @@ then "mathfu" --> "Tasks" --> "other" --> "get_mathfu".
 1. Select *"app"* inside Android Studio *"Project"* pane.
 1. Click *Tools/Android/Sync Project with Gradle Files*.
 1. Click *Run/Run 'app'*.
-
-
-Tutorial List
--------------
-1. tutorial01_load_vulkan
-    - create a vulkan device
-1. tutorial02_prebuilt_layers
-    - create a vulkan device with vulkan validation layers
-1. tutorial03_traceable_layers
-    - create a vulkan device with validation layers that could be traced.
-      Refer to README.md under its directory
-1. tutorial04_first_window
-    - create a vulkan window with WSI 
-1. tutorial05_triangle
-    - draw a simple triangle with android shaderc feature
 
 
 License

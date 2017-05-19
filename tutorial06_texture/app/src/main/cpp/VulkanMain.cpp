@@ -15,12 +15,12 @@
 #include <vector>
 #include <cassert>
 #include <android/log.h>
-#include <shaderc/shaderc.hpp>
 #include "vulkan_wrapper.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include <stb/stb_image.h>
 #include "VulkanMain.hpp"
+#include "CreateShaderModule.h"
 
 // Android log function wrappers
 static const char* kTAG = "Vulkan-Tutorial06";
@@ -128,20 +128,20 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   // **********************************************************
   // Create the Vulkan instance
   VkInstanceCreateInfo instanceCreateInfo {
-          .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-          .pNext = nullptr,
-          .pApplicationInfo = appInfo,
-          .enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size()),
-          .ppEnabledExtensionNames = instance_extensions.data(),
-          .enabledLayerCount = 0,
-          .ppEnabledLayerNames = nullptr,
+      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+      .pNext = nullptr,
+      .pApplicationInfo = appInfo,
+      .enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size()),
+      .ppEnabledExtensionNames = instance_extensions.data(),
+      .enabledLayerCount = 0,
+      .ppEnabledLayerNames = nullptr,
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &device.instance_));
   VkAndroidSurfaceCreateInfoKHR createInfo {
-          .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
-          .pNext = nullptr,
-          .flags = 0,
-          .window = platformWindow};
+      .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+      .pNext = nullptr,
+      .flags = 0,
+      .window = platformWindow};
 
   CALL_VK(vkCreateAndroidSurfaceKHR(device.instance_, &createInfo, nullptr,
                                     &device.surface_));
@@ -160,24 +160,24 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   // Create a logical device (vulkan device)
   float priorities[] = { 1.0f, };
   VkDeviceQueueCreateInfo queueCreateInfo {
-          .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-          .pNext = nullptr,
-          .flags = 0,
-          .queueCount = 1,
-          .queueFamilyIndex = 0,
-          .pQueuePriorities = priorities,
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .queueCount = 1,
+      .queueFamilyIndex = 0,
+      .pQueuePriorities = priorities,
   };
 
   VkDeviceCreateInfo deviceCreateInfo {
-          .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-          .pNext = nullptr,
-          .queueCreateInfoCount = 1,
-          .pQueueCreateInfos = &queueCreateInfo,
-          .enabledLayerCount = 0,
-          .ppEnabledLayerNames = nullptr,
-          .enabledExtensionCount = static_cast<uint32_t>(device_extensions.size()),
-          .ppEnabledExtensionNames = device_extensions.data(),
-          .pEnabledFeatures = nullptr,
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext = nullptr,
+      .queueCreateInfoCount = 1,
+      .pQueueCreateInfos = &queueCreateInfo,
+      .enabledLayerCount = 0,
+      .ppEnabledLayerNames = nullptr,
+      .enabledExtensionCount = static_cast<uint32_t>(device_extensions.size()),
+      .ppEnabledExtensionNames = device_extensions.data(),
+      .pEnabledFeatures = nullptr,
   };
 
   CALL_VK(vkCreateDevice(device.gpuDevice_, &deviceCreateInfo, nullptr,
@@ -221,22 +221,22 @@ void CreateSwapChain() {
   // in the chain)
   uint32_t queueFamily = 0;
   VkSwapchainCreateInfoKHR swapchainCreateInfo {
-          .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-          .pNext = nullptr,
-          .surface = device.surface_,
-          .minImageCount = surfaceCapabilities.minImageCount,
-          .imageFormat = formats[chosenFormat].format,
-          .imageColorSpace = formats[chosenFormat].colorSpace,
-          .imageExtent = surfaceCapabilities.currentExtent,
-          .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-          .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-          .imageArrayLayers = 1,
-          .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-          .queueFamilyIndexCount = 1,
-          .pQueueFamilyIndices = &queueFamily,
-          .presentMode = VK_PRESENT_MODE_FIFO_KHR,
-          .oldSwapchain = VK_NULL_HANDLE,
-          .clipped = VK_FALSE,
+      .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+      .pNext = nullptr,
+      .surface = device.surface_,
+      .minImageCount = surfaceCapabilities.minImageCount,
+      .imageFormat = formats[chosenFormat].format,
+      .imageColorSpace = formats[chosenFormat].colorSpace,
+      .imageExtent = surfaceCapabilities.currentExtent,
+      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+      .imageArrayLayers = 1,
+      .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .queueFamilyIndexCount = 1,
+      .pQueueFamilyIndices = &queueFamily,
+      .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+      .oldSwapchain = VK_NULL_HANDLE,
+      .clipped = VK_FALSE,
   };
   CALL_VK(vkCreateSwapchainKHR(device.device_, &swapchainCreateInfo,
                                nullptr, &swapchain.swapchain_));
@@ -295,14 +295,14 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
             swapchain.displayViews_[i], depthView,
     };
     VkFramebufferCreateInfo fbCreateInfo {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .pNext = nullptr,
-            .renderPass = renderPass,
-            .layers = 1,
-            .attachmentCount = 1,  // 2 if using depth
-            .pAttachments = attachments,
-            .width = static_cast<uint32_t>(swapchain.displaySize_.width),
-            .height = static_cast<uint32_t>(swapchain.displaySize_.height),
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .pNext = nullptr,
+        .renderPass = renderPass,
+        .layers = 1,
+        .attachmentCount = 1,  // 2 if using depth
+        .pAttachments = attachments,
+        .width = static_cast<uint32_t>(swapchain.displaySize_.width),
+        .height = static_cast<uint32_t>(swapchain.displaySize_.height),
     };
     fbCreateInfo.attachmentCount = (depthView == VK_NULL_HANDLE ? 1 : 2);
 
@@ -334,10 +334,11 @@ VkResult AllocateMemoryTypeFromProperties(
   // No memory types matched, return failure
   return VK_ERROR_MEMORY_MAP_FAILED;
 }
-VkResult tutorialLoadTextureFromFile(const char* filePath,
-                                     struct texture_object* tex_obj,
-                                     VkImageUsageFlags usage,
-                                     VkFlags required_props) {
+
+VkResult LoadTextureFromFile(const char* filePath,
+                             struct texture_object* tex_obj,
+                             VkImageUsageFlags usage,
+                             VkFlags required_props) {
   if (!(usage | required_props)) {
     __android_log_print(ANDROID_LOG_ERROR,
         "tutorial texture", "No usage and required_pros");
@@ -548,7 +549,7 @@ VkResult tutorialLoadTextureFromFile(const char* filePath,
 
 void CreateTexture() {
   for (uint32_t i = 0; i < TUTORIAL_TEXTURE_COUNT; i++) {
-    tutorialLoadTextureFromFile(texFiles[i], &textures[i],
+    LoadTextureFromFile(texFiles[i], &textures[i],
         VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     const VkSamplerCreateInfo sampler = {
@@ -622,14 +623,14 @@ bool CreateBuffers(void) {
   // Create a vertex buffer
   uint32_t queueIdx = 0;
   VkBufferCreateInfo createBufferInfo {
-          .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-          .pNext = nullptr,
-          .size = sizeof(vertexData),
-          .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-          .flags = 0,
-          .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-          .pQueueFamilyIndices = &queueIdx,
-          .queueFamilyIndexCount = 1,
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .pNext = nullptr,
+      .size = sizeof(vertexData),
+      .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      .flags = 0,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .pQueueFamilyIndices = &queueIdx,
+      .queueFamilyIndexCount = 1,
   };
 
   CALL_VK(vkCreateBuffer(device.device_, &createBufferInfo, nullptr,
@@ -639,17 +640,17 @@ bool CreateBuffers(void) {
   vkGetBufferMemoryRequirements(device.device_, buffers.vertexBuf, &memReq);
 
   VkMemoryAllocateInfo allocInfo {
-          .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-          .pNext = nullptr,
-          .allocationSize = sizeof(vertexData),
-          .memoryTypeIndex = 0,  // Memory type assigned in the next step
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .pNext = nullptr,
+      .allocationSize = sizeof(vertexData),
+      .memoryTypeIndex = 0,  // Memory type assigned in the next step
   };
 
   // Assign the proper memory type for that buffer
   allocInfo.allocationSize = memReq.size;
   MapMemoryTypeToIndex(memReq.memoryTypeBits,
-                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                              &allocInfo.memoryTypeIndex);
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                       &allocInfo.memoryTypeIndex);
 
   // Allocate memory for the buffer
   VkDeviceMemory deviceMemory;
@@ -667,61 +668,6 @@ bool CreateBuffers(void) {
 
 void DeleteBuffers(void) {
         vkDestroyBuffer(device.device_, buffers.vertexBuf, nullptr);
-}
-
-/*
- * run-time build shaders with shaderc lib. The usage is parallel to
- * openGL traditional programming model. Shaderc is packaged in CDep:
- *     https://github.com/google/cdep
- */
-enum ShaderType { VERTEX_SHADER, FRAGMENT_SHADER };
-shaderc_shader_kind getShadercShaderType(ShaderType type) {
-  switch (type) {
-    case VERTEX_SHADER:  return shaderc_glsl_vertex_shader;
-    case FRAGMENT_SHADER: return shaderc_glsl_fragment_shader;
-
-      // more shader types could be added later
-  }
-  return static_cast<shaderc_shader_kind>(-1);
-}
-VkResult buildShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
-                             ShaderType type) {
-  // Read the file:
-  AAsset* file = AAssetManager_open(androidAppCtx->activity->assetManager,
-                                    filePath, AASSET_MODE_BUFFER);
-  size_t glslShaderLen = AAsset_getLength(file);
-  std::vector<char>  glslShader;
-  glslShader.resize(glslShaderLen);
-
-  AAsset_read(file, static_cast<void*>(glslShader.data()), glslShaderLen);
-  AAsset_close(file);
-
-  // Build spir-V shader
-  shaderc_compiler_t compiler = shaderc_compiler_initialize();
-  shaderc_compilation_result_t spvShader = shaderc_compile_into_spv(
-          compiler,
-          glslShader.data(), glslShaderLen, getShadercShaderType(type),
-          "shaderc_error", "main", nullptr);
-  if (shaderc_result_get_compilation_status(spvShader)
-      != shaderc_compilation_status_success) {
-    return static_cast<VkResult>(-1);
-  }
-
-  // then build shader module
-  VkShaderModuleCreateInfo shaderModuleCreateInfo{
-          .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-          .pNext = nullptr,
-          .codeSize = shaderc_result_get_length(spvShader),
-          .pCode = (const uint32_t*)shaderc_result_get_bytes(spvShader),
-          .flags = 0,
-  };
-  VkResult result = vkCreateShaderModule(
-          device.device_, &shaderModuleCreateInfo, nullptr, shaderOut);
-
-  shaderc_result_release(spvShader);
-  shaderc_compiler_release(compiler);
-
-  return result;
 }
 
 // Create Graphics Pipeline
@@ -762,9 +708,12 @@ VkResult CreateGraphicsPipeline() {
       .pDynamicStates = nullptr };
 
   VkShaderModule vertexShader,fragmentShader;
-  buildShaderFromFile("shaders/tri.vert", &vertexShader, VERTEX_SHADER);
-  buildShaderFromFile("shaders/tri.frag", &fragmentShader, FRAGMENT_SHADER);
-
+  buildShaderFromFile(androidAppCtx, "shaders/tri.vert",
+                      VK_SHADER_STAGE_VERTEX_BIT,
+                      device.device_, &vertexShader);
+  buildShaderFromFile(androidAppCtx, "shaders/tri.frag",
+                      VK_SHADER_STAGE_FRAGMENT_BIT,
+                      device.device_, &fragmentShader);
   // Specify vertex and fragment shader stages
   VkPipelineShaderStageCreateInfo shaderStages[2] {
       {
@@ -797,8 +746,8 @@ VkResult CreateGraphicsPipeline() {
   };
 
   VkRect2D scissor = {
-          .extent = swapchain.displaySize_,
-          .offset = {.x = 0, .y = 0,}
+      .extent = swapchain.displaySize_,
+      .offset = {.x = 0, .y = 0,}
   };
   // Specify viewport info
   VkPipelineViewportStateCreateInfo viewportInfo {
@@ -1030,7 +979,7 @@ bool InitVulkan(android_app* app) {
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
       .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
       .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,  //TODO: should this be VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
       .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
   };
 
