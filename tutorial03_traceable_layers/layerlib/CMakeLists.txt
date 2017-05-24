@@ -39,19 +39,29 @@ if(NOT (${ANDROID_NDK_REVISION} LESS 13))
     include_directories(${NDK_SRC_DIR}/third_party/shaderc/third_party/glslang
                         ${NDK_SRC_DIR}/third_party/shaderc/third_party/spirv-tools/include)
 
-    set(SHADERC_OUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/shaderc)
+    set(SHADERC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/build/shaderc)
     set(lib_shaderc ${SHADERC_OUT_DIR}/gnustl_static/${ANDROID_ABI}/libshaderc.a)
     set(SHADERC_SRC_DIR ${NDK_SRC_DIR}/third_party/shaderc)
+
+    set(NDK_TOOLCHAIN_CFG ${ANDROID_TOOLCHAIN})
+    string(TOLOWER "${NDK_TOOLCHAIN_CFG}" NDK_TOOLCHAIN_CFG)
+    if(${ANDROID_TOOLCHAIN} STREQUAL "gcc")
+        set(NDK_TOOLCHAIN_CFG "4.9")
+    endif()
+
     if(CMAKE_HOST_WIN32)
         ExternalProject_Add(BuildShaderc
             SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}
             CONFIGURE_COMMAND ""
             BUILD_COMMAND ${ANDROID_NDK}/ndk-build.cmd --jobs=8 NDK_DEBUG=1
-                          NDK_PROJECT_PATH=${SHADERC_SRC_DIR}
-                          NDK_OUT=./shaderc NDK_LIBS_OUT=${SHADERC_OUT_DIR}
-                          NDK_APPLICATION_MK=${CMAKE_CURRENT_SOURCE_DIR}/Application.mk
-                          APP_BUILD_SCRIPT=${SHADERC_SRC_DIR}/Android.mk
-                          libshaderc_combined
+                NDK_PROJECT_PATH=${SHADERC_SRC_DIR}
+                NDK_LIBS_OUT=${SHADERC_OUT_DIR}
+                APP_ABI=${ANDROID_ABI}
+                APP_PLATFORM=${ANDROID_PLATFORM}
+                APP_STL=${ANDROID_STL}
+                NDK_TOOLCHAIN_VERSION=${NDK_TOOLCHAIN_CFG}
+                APP_BUILD_SCRIPT=${SHADERC_SRC_DIR}/Android.mk
+                libshaderc_combined
             LOG_CONFIGURE 1
             BUILD_ALWAYS 1
             LOG_BUILD    1
@@ -62,11 +72,14 @@ if(NOT (${ANDROID_NDK_REVISION} LESS 13))
             SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}
             CONFIGURE_COMMAND mkdir -p ${SHADERC_OUT_DIR}
             BUILD_COMMAND ${ANDROID_NDK}/ndk-build --jobs=8 NDK_DEBUG=1
-                          NDK_PROJECT_PATH=${SHADERC_SRC_DIR}
-                          NDK_LIBS_OUT=${SHADERC_OUT_DIR}
-                          NDK_APPLICATION_MK=${CMAKE_CURRENT_SOURCE_DIR}/Application.mk
-                          APP_BUILD_SCRIPT=${SHADERC_SRC_DIR}/Android.mk
-                          libshaderc_combined     # make the combined lib to use
+                NDK_PROJECT_PATH=${SHADERC_SRC_DIR}
+                NDK_LIBS_OUT=${SHADERC_OUT_DIR}
+                APP_ABI=${ANDROID_ABI}
+                APP_PLATFORM=${ANDROID_PLATFORM}
+                APP_STL=${ANDROID_STL}
+                NDK_TOOLCHAIN_VERSION=${NDK_TOOLCHAIN_CFG}
+                APP_BUILD_SCRIPT=${SHADERC_SRC_DIR}/Android.mk
+                libshaderc_combined     # make the combined lib to use
             BUILD_ALWAYS 1    # Force build
             BUILD_BYPRODUCTS ${lib_shaderc}
             INSTALL_COMMAND "")
