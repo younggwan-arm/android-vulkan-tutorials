@@ -367,7 +367,8 @@ VkResult LoadTextureFromFile(const char* filePath,
   uint32_t imgWidth, imgHeight, n;
   unsigned char* imageData = stbi_load_from_memory(
       fileContent, fileLength, reinterpret_cast<int*>(&imgWidth),
-      reinterpret_cast<int*>(&imgHeight), reinterpret_cast<int*>(&n), 0);
+      reinterpret_cast<int*>(&imgHeight), reinterpret_cast<int*>(&n), 4);
+  assert(n == 4);
 
   tex_obj->tex_width = imgWidth;
   tex_obj->tex_height = imgHeight;
