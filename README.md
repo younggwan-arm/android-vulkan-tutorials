@@ -17,16 +17,16 @@ Contents
 -------------
 1. tutorial01_load_vulkan
 - create a vulkan device
-1. tutorial02_prebuilt_layers
+2. tutorial02_prebuilt_layers
 - create a vulkan device with vulkan validation layers
-1. tutorial03_traceable_layers
+3. tutorial03_traceable_layers
 - create a vulkan device with validation layers that could be traced.
 Refer to README.md under its directory
-1. tutorial04_first_window
+4. tutorial04_first_window
 - create a vulkan window with WSI 
-1. tutorial05_triangle
+5. tutorial05_triangle
 - draw a simple triangle with Android Studio integrated shaderc feature
-1. tutorial06_texture
+6. tutorial06_texture
 - draw textured triangle with [CDep](https://github.com/google/cdep) packed shaderc pre-built binary
 - glsl shaders are compiled at app run time (similar to openGL traditional shader compiling model)
 
