@@ -26,3 +26,17 @@ android {
         }
     }
 }
+
+// ******** Generate cdep module file for shaderc *******
+// this is same as running on command line of: ./cdep [cdep.bat]
+def CDEP_CMD='./cdep'
+if (System.properties['os.name'].toLowerCase().contains('windows')) {
+    CDEP_CMD='cdep.bat'
+}
+if(!file("../.cdep").exists()) {
+    exec {
+        workingDir("..")
+        executable "${CDEP_CMD}"
+        args = []
+    }
+}
