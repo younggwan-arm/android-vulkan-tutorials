@@ -6,5 +6,6 @@ build
 *~
 local.properties
 .externalNativeBuild
+.cdep
 
 

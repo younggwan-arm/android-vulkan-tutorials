@@ -57,7 +57,6 @@ void handle_cmd(android_app* app, int32_t cmd);
 
 // typical Android NativeActivity entry function
 void android_main(struct android_app* app) {
-  app_dummy();
 
   app->onAppCmd = handle_cmd;
 
