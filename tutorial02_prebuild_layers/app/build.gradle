@@ -7,7 +7,7 @@ def valLayerBinDir = "${ndkDir}/sources/third_party/vulkan/src/build-android/jni
 
 android {
     compileSdkVersion 24
-    buildToolsVersion "24.0.1"
+    buildToolsVersion '25.0.0'
 
     defaultConfig {
         applicationId "com.vulkan.tutorials.two"

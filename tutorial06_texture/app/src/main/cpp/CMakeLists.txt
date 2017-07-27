@@ -34,7 +34,7 @@ if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} \
        -Wl,--no-warn-mismatch")
 endif()
-
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 target_link_libraries(vktuts native_glue log android)
 
 ########     CDep package for shaderc    ######################
