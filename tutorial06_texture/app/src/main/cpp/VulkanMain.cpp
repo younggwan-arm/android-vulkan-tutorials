@@ -48,35 +48,35 @@ static const char* kTAG = "Vulkan-Tutorial06";
 struct VulkanDeviceInfo {
     bool initialized_;
 
-    VkInstance          instance_;
-    VkPhysicalDevice    gpuDevice_;
+    VkInstance        instance_;
+    VkPhysicalDevice  gpuDevice_;
     VkPhysicalDeviceMemoryProperties gpuMemoryProperties_;
-    VkDevice            device_;
+    VkDevice          device_;
 
-    VkSurfaceKHR        surface_;
-    VkQueue             queue_;
+    VkSurfaceKHR      surface_;
+    VkQueue           queue_;
 };
 VulkanDeviceInfo  device;
 
 struct VulkanSwapchainInfo {
     VkSwapchainKHR swapchain_;
-    uint32_t swapchainLength_;
+    uint32_t       swapchainLength_;
 
-    VkExtent2D displaySize_;
-    VkFormat displayFormat_;
+    VkExtent2D     displaySize_;
+    VkFormat       displayFormat_;
 
     // array of frame buffers and views
     VkFramebuffer* framebuffers_;
-    VkImageView* displayViews_;
+    VkImageView*   displayViews_;
 };
 VulkanSwapchainInfo  swapchain;
 
 typedef struct texture_object {
-    VkSampler sampler;
-    VkImage image;
-    VkImageLayout imageLayout;
+    VkSampler      sampler;
+    VkImage        image;
+    VkImageLayout  imageLayout;
     VkDeviceMemory mem;
-    VkImageView view;
+    VkImageView    view;
     int32_t tex_width, tex_height;
 } texture_object;
 static const VkFormat kTexFmt = VK_FORMAT_R8G8B8A8_UNORM;
@@ -93,21 +93,21 @@ VulkanBufferInfo buffers;
 
 struct VulkanGfxPipelineInfo {
     VkDescriptorSetLayout dscLayout;
-    VkDescriptorPool  descPool;
-    VkDescriptorSet   descSet;
-    VkPipelineLayout  layout;
-    VkPipelineCache   cache;
-    VkPipeline        pipeline;
+    VkDescriptorPool      descPool;
+    VkDescriptorSet       descSet;
+    VkPipelineLayout      layout;
+    VkPipelineCache       cache;
+    VkPipeline            pipeline;
 };
 VulkanGfxPipelineInfo gfxPipeline;
 
 struct VulkanRenderInfo {
-    VkRenderPass renderPass_;
-    VkCommandPool cmdPool_;
+    VkRenderPass     renderPass_;
+    VkCommandPool    cmdPool_;
     VkCommandBuffer* cmdBuffer_;
     uint32_t         cmdBufferLen_;
-    VkSemaphore   semaphore_;
-    VkFence       fence_;
+    VkSemaphore      semaphore_;
+    VkFence          fence_;
 };
 VulkanRenderInfo render;
 
@@ -672,7 +672,7 @@ void DeleteBuffers(void) {
 }
 
 // Create Graphics Pipeline
-VkResult CreateGraphicsPipeline() {
+VkResult CreateGraphicsPipeline(void) {
   memset(&gfxPipeline, 0, sizeof(gfxPipeline));
 
   const VkDescriptorSetLayoutBinding descriptorSetLayoutBinding {
