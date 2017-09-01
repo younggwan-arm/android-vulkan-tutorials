@@ -41,25 +41,25 @@ static const char* kTAG = "Vulkan-Tutorial04";
 struct VulkanDeviceInfo {
     bool initialized_;
 
-    VkInstance          instance_;
-    VkPhysicalDevice    gpuDevice_;
-    VkDevice            device_;
+    VkInstance        instance_;
+    VkPhysicalDevice  gpuDevice_;
+    VkDevice          device_;
 
-    VkSurfaceKHR        surface_;
-    VkQueue             queue_;
+    VkSurfaceKHR      surface_;
+    VkQueue           queue_;
 };
 VulkanDeviceInfo  device;
 
 struct VulkanSwapchainInfo {
     VkSwapchainKHR swapchain_;
-    uint32_t swapchainLength_;
+    uint32_t       swapchainLength_;
 
-    VkExtent2D displaySize_;
-    VkFormat displayFormat_;
+    VkExtent2D     displaySize_;
+    VkFormat       displayFormat_;
 
     // array of frame buffers and views
     VkFramebuffer* framebuffers_;
-    VkImageView* displayViews_;
+    VkImageView*   displayViews_;
 };
 VulkanSwapchainInfo  swapchain;
 
@@ -76,12 +76,12 @@ struct VulkanGfxPipelineInfo {
 VulkanGfxPipelineInfo gfxPipeline;
 
 struct VulkanRenderInfo {
-    VkRenderPass renderPass_;
-    VkCommandPool cmdPool_;
+    VkRenderPass     renderPass_;
+    VkCommandPool    cmdPool_;
     VkCommandBuffer* cmdBuffer_;
     uint32_t         cmdBufferLen_;
-    VkSemaphore   semaphore_;
-    VkFence       fence_;
+    VkSemaphore      semaphore_;
+    VkFence          fence_;
 };
 VulkanRenderInfo render;
 
@@ -395,7 +395,7 @@ VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
 }
 
 // Create Graphics Pipeline
-VkResult CreateGraphicsPipeline() {
+VkResult CreateGraphicsPipeline(void) {
   memset(&gfxPipeline, 0, sizeof(gfxPipeline));
   // Create pipeline layout (empty)
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
