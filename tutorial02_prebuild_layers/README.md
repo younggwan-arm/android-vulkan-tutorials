@@ -6,9 +6,9 @@ Tutorial 02 - use validation layers - 1
 
 Verification
 ============
-Planted error: this sample sets VkDeviceQueueCreateInfo::pQueuePriorities to nullptr,
+Planted error: this sample sets `VkDeviceQueueCreateInfo::pQueuePriorities` to nullptr,
 which will trigger validation layers to notify us from registered callback function
-vkDebugReportCallbackEX_impl(); putting a breakpoint with Android Studo, observe
+`vkDebugReportCallbackEX_impl();` putting a breakpoint with Android Studo, observe
 the breakpoint being triggered.
 
 
