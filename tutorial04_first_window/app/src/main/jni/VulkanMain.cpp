@@ -39,7 +39,7 @@ static const char* kTAG = "Vulkan-Tutorial04";
 
 // Global Variables ...
 struct VulkanDeviceInfo {
-    bool initialized_;
+    bool             initialized_;
 
     VkInstance       instance_;
     VkPhysicalDevice gpuDevice_;
@@ -144,7 +144,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   vkGetDeviceQueue(device.device_, 0, 0, &device.queue_);
 }
 
-void CreateSwapChain() {
+void CreateSwapChain(void) {
   LOGI("->createSwapChain");
   memset(&swapchain, 0, sizeof(swapchain));
 
@@ -205,6 +205,17 @@ void CreateSwapChain() {
                                   &swapchain.swapchainLength_, nullptr));
   delete [] formats;
   LOGI("<-createSwapChain");
+}
+
+void DeleteSwapChain(void) {
+  for (int i = 0; i < swapchain.swapchainLength_; i++) {
+    vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
+    vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
+  }
+  delete[] swapchain.framebuffers_;
+  delete[] swapchain.displayViews_;
+
+  vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
 }
 
 void CreateFrameBuffers(VkRenderPass& renderPass,
@@ -437,20 +448,9 @@ bool IsVulkanReady(void) {
   return device.initialized_;
 }
 
-void DeleteSwapChain() {
-  for (int i = 0; i < swapchain.swapchainLength_; i++) {
-    vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
-    vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
-  }
-  delete[] swapchain.framebuffers_;
-  delete[] swapchain.displayViews_;
-
-  vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
-}
-
-void DeleteVulkan() {
+void DeleteVulkan(void) {
   vkFreeCommandBuffers(device.device_, render.cmdPool_,
-          render.cmdBufferLen_, render.cmdBuffer_);
+                       render.cmdBufferLen_, render.cmdBuffer_);
   delete[] render.cmdBuffer_;
 
   vkDestroyCommandPool(device.device_, render.cmdPool_, nullptr);
@@ -468,8 +468,8 @@ bool VulkanDrawFrame(void) {
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
-                              UINT64_MAX, render.semaphore_,
-                              VK_NULL_HANDLE, &nextIndex));
+                                UINT64_MAX, render.semaphore_,
+                                VK_NULL_HANDLE, &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
   VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,

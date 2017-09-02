@@ -78,8 +78,8 @@ VkResult buildShaderFromFile(android_app* appInfo,
           .pCode = (const uint32_t*)shaderc_result_get_bytes(spvShader),
           .flags = 0,
   };
-  VkResult result = vkCreateShaderModule(
-          vkDevice, &shaderModuleCreateInfo, nullptr, shaderOut);
+  VkResult result = vkCreateShaderModule(vkDevice, &shaderModuleCreateInfo,
+                                         nullptr, shaderOut);
 
   shaderc_result_release(spvShader);
   shaderc_compiler_release(compiler);

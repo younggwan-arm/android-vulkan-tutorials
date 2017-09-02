@@ -348,7 +348,7 @@ uint32_t LayerAndExtensions::DevExtCount(void) {
     return devExts_.size();
 }
 
-const char* LayerAndExtensions::GetDbgExtName() {
+const char* LayerAndExtensions::GetDbgExtName(void) {
     return kDbgExtName;
 }
 bool LayerAndExtensions::HookDbgReportExt(VkInstance instance) {

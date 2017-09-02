@@ -51,7 +51,7 @@ class LayerAndExtensions  {
     bool     IsInstExtSupported(const char* extName);
     bool     IsInstLayerSupported(const char* layerName);
 
-    const char* GetDbgExtName();
+    const char* GetDbgExtName(void);
     bool     AddInstanceExt(const char* extName);
     bool     HookDbgReportExt(VkInstance instance);
 

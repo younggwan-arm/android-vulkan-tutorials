@@ -39,7 +39,7 @@ static const char* kTAG = "Vulkan-Tutorial04";
 
 // Global Variables ...
 struct VulkanDeviceInfo {
-    bool initialized_;
+    bool              initialized_;
 
     VkInstance        instance_;
     VkPhysicalDevice  gpuDevice_;
@@ -64,14 +64,14 @@ struct VulkanSwapchainInfo {
 VulkanSwapchainInfo  swapchain;
 
 struct VulkanBufferInfo {
-    VkBuffer vertexBuf;
+    VkBuffer vertexBuf_;
 };
 VulkanBufferInfo buffers;
 
 struct VulkanGfxPipelineInfo {
-    VkPipelineLayout  layout;
-    VkPipelineCache   cache;
-    VkPipeline        pipeline;
+    VkPipelineLayout  layout_;
+    VkPipelineCache   cache_;
+    VkPipeline        pipeline_;
 };
 VulkanGfxPipelineInfo gfxPipeline;
 
@@ -156,7 +156,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   vkGetDeviceQueue(device.device_, 0, 0, &device.queue_);
 }
 
-void CreateSwapChain() {
+void CreateSwapChain(void) {
   LOGI("->createSwapChain");
   memset(&swapchain, 0, sizeof(swapchain));
 
@@ -217,6 +217,17 @@ void CreateSwapChain() {
                                   &swapchain.swapchainLength_, nullptr));
   delete [] formats;
   LOGI("<-createSwapChain");
+}
+
+void DeleteSwapChain(void) {
+  for (int i = 0; i < swapchain.swapchainLength_; i++) {
+    vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
+    vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
+  }
+  delete[] swapchain.framebuffers_;
+  delete[] swapchain.displayViews_;
+
+  vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
 }
 
 void CreateFrameBuffers(VkRenderPass& renderPass,
@@ -284,8 +295,8 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
 
 // A helper function
 bool MapMemoryTypeToIndex(uint32_t typeBits,
-                              VkFlags requirements_mask,
-                              uint32_t *typeIndex) {
+                          VkFlags requirements_mask,
+                          uint32_t *typeIndex) {
   VkPhysicalDeviceMemoryProperties memoryProperties;
   vkGetPhysicalDeviceMemoryProperties(device.gpuDevice_, &memoryProperties);
   // Search memtypes to find first index with those properties
@@ -329,10 +340,10 @@ bool CreateBuffers(void) {
   };
 
   CALL_VK(vkCreateBuffer(device.device_, &createBufferInfo, nullptr,
-                         &buffers.vertexBuf));
+                         &buffers.vertexBuf_));
 
   VkMemoryRequirements memReq;
-  vkGetBufferMemoryRequirements(device.device_, buffers.vertexBuf, &memReq);
+  vkGetBufferMemoryRequirements(device.device_, buffers.vertexBuf_, &memReq);
 
   VkMemoryAllocateInfo allocInfo {
           .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -344,8 +355,8 @@ bool CreateBuffers(void) {
   // Assign the proper memory type for that buffer
   allocInfo.allocationSize = memReq.size;
   MapMemoryTypeToIndex(memReq.memoryTypeBits,
-                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                              &allocInfo.memoryTypeIndex);
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                       &allocInfo.memoryTypeIndex);
 
   // Allocate memory for the buffer
   VkDeviceMemory deviceMemory;
@@ -357,21 +368,22 @@ bool CreateBuffers(void) {
   memcpy(data, vertexData, sizeof(vertexData));
   vkUnmapMemory(device.device_, deviceMemory);
 
-  CALL_VK(vkBindBufferMemory(device.device_, buffers.vertexBuf, deviceMemory, 0));
+  CALL_VK(vkBindBufferMemory(device.device_, buffers.vertexBuf_, deviceMemory, 0));
   return true;
 }
 
 void DeleteBuffers(void) {
-        vkDestroyBuffer(device.device_, buffers.vertexBuf, nullptr);
+        vkDestroyBuffer(device.device_, buffers.vertexBuf_, nullptr);
 }
 
 enum ShaderType { VERTEX_SHADER, FRAGMENT_SHADER };
-VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
+VkResult loadShaderFromFile(const char* filePath,
+                            VkShaderModule* shaderOut,
                             ShaderType type) {
   // Read the file
   assert(androidAppCtx);
   AAsset* file = AAssetManager_open(androidAppCtx->activity->assetManager,
-                             filePath, AASSET_MODE_BUFFER);
+                                    filePath, AASSET_MODE_BUFFER);
   size_t fileLength = AAsset_getLength(file);
 
   char* fileContent = new char[fileLength];
@@ -407,7 +419,7 @@ VkResult CreateGraphicsPipeline(void) {
           .pPushConstantRanges = nullptr,
   };
   CALL_VK(vkCreatePipelineLayout(device.device_, &pipelineLayoutCreateInfo,
-                                 nullptr, &gfxPipeline.layout));
+                                 nullptr, &gfxPipeline.layout_));
 
   // No dynamic state in that tutorial
   VkPipelineDynamicStateCreateInfo dynamicStateInfo = {
@@ -548,7 +560,7 @@ VkResult CreateGraphicsPipeline(void) {
   };
 
   CALL_VK(vkCreatePipelineCache(device.device_, &pipelineCacheInfo, nullptr,
-                                &gfxPipeline.cache));
+                                &gfxPipeline.cache_));
 
   // Create the pipeline
   VkGraphicsPipelineCreateInfo pipelineCreateInfo {
@@ -566,7 +578,7 @@ VkResult CreateGraphicsPipeline(void) {
           .pDepthStencilState = nullptr,
           .pColorBlendState = &colorBlendInfo,
           .pDynamicState = &dynamicStateInfo,
-          .layout = gfxPipeline.layout,
+          .layout = gfxPipeline.layout_,
           .renderPass = render.renderPass_,
           .subpass = 0,
           .basePipelineHandle = VK_NULL_HANDLE,
@@ -574,8 +586,8 @@ VkResult CreateGraphicsPipeline(void) {
   };
 
   VkResult pipelineResult =
-          vkCreateGraphicsPipelines(device.device_, gfxPipeline.cache, 1,
-                                    &pipelineCreateInfo, nullptr, &gfxPipeline.pipeline);
+          vkCreateGraphicsPipelines(device.device_, gfxPipeline.cache_, 1,
+                                    &pipelineCreateInfo, nullptr, &gfxPipeline.pipeline_);
 
   // We don't need the shaders anymore, we can release their memory
   vkDestroyShaderModule(device.device_, vertexShader, nullptr);
@@ -585,11 +597,11 @@ VkResult CreateGraphicsPipeline(void) {
 }
 
 void DeleteGraphicsPipeline(void) {
-  if (gfxPipeline.pipeline == VK_NULL_HANDLE)
+  if (gfxPipeline.pipeline_ == VK_NULL_HANDLE)
      return;
-  vkDestroyPipeline(device.device_, gfxPipeline.pipeline, nullptr);
-  vkDestroyPipelineCache(device.device_,gfxPipeline.cache, nullptr);
-  vkDestroyPipelineLayout(device.device_, gfxPipeline.layout, nullptr);
+  vkDestroyPipeline(device.device_, gfxPipeline.pipeline_, nullptr);
+  vkDestroyPipelineCache(device.device_,gfxPipeline.cache_, nullptr);
+  vkDestroyPipelineLayout(device.device_, gfxPipeline.layout_, nullptr);
 }
 // InitVulkan:
 //   Initialize Vulkan Context when android application window is created
@@ -730,9 +742,9 @@ bool InitVulkan(android_app* app) {
                          VK_SUBPASS_CONTENTS_INLINE);
     // Bind what is necessary to the command buffer
     vkCmdBindPipeline(render.cmdBuffer_[bufferIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      gfxPipeline.pipeline);
+                      gfxPipeline.pipeline_);
     VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(render.cmdBuffer_[bufferIndex], 0, 1, &buffers.vertexBuf,
+    vkCmdBindVertexBuffers(render.cmdBuffer_[bufferIndex], 0, 1, &buffers.vertexBuf_,
                            &offset);
 
     // Draw Triangle
@@ -772,20 +784,9 @@ bool IsVulkanReady(void) {
   return device.initialized_;
 }
 
-void DeleteSwapChain() {
-  for (int i = 0; i < swapchain.swapchainLength_; i++) {
-    vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
-    vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
-  }
-  delete[] swapchain.framebuffers_;
-  delete[] swapchain.displayViews_;
-
-  vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
-}
-
-void DeleteVulkan() {
+void DeleteVulkan(void) {
   vkFreeCommandBuffers(device.device_, render.cmdPool_,
-          render.cmdBufferLen_, render.cmdBuffer_);
+                       render.cmdBufferLen_, render.cmdBuffer_);
   delete[] render.cmdBuffer_;
 
   vkDestroyCommandPool(device.device_, render.cmdPool_, nullptr);
@@ -805,8 +806,8 @@ bool VulkanDrawFrame(void) {
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
-                              UINT64_MAX, render.semaphore_,
-                              VK_NULL_HANDLE, &nextIndex));
+                                UINT64_MAX, render.semaphore_,
+                                VK_NULL_HANDLE, &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
 
   VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

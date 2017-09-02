@@ -59,14 +59,14 @@ static const char* kDbgExtName = "VK_EXT_debug_report";
 
 // Simple Dbg Callback function to be used by Vk engine
 static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
-        VkDebugReportFlagsEXT                       flags,
-        VkDebugReportObjectTypeEXT                  objectType,
-        uint64_t                                    object,
-        size_t                                      location,
-        int32_t                                     messageCode,
-        const char*                                 pLayerPrefix,
-        const char*                                 pMessage,
-        void*                                       pUserData) {
+        VkDebugReportFlagsEXT       flags,
+        VkDebugReportObjectTypeEXT  objectType,
+        uint64_t                    object,
+        size_t                      location,
+        int32_t                     messageCode,
+        const char*                 pLayerPrefix,
+        const char*                 pMessage,
+        void*                       pUserData) {
 
     if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
         __android_log_print(ANDROID_LOG_INFO,"Vulkan Debug Message: ",
@@ -348,7 +348,7 @@ uint32_t LayerAndExtensions::DevExtCount(void) {
     return devExts_.size();
 }
 
-const char* LayerAndExtensions::GetDbgExtName() {
+const char* LayerAndExtensions::GetDbgExtName(void) {
     return kDbgExtName;
 }
 bool LayerAndExtensions::HookDbgReportExt(VkInstance instance) {

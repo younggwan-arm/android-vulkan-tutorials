@@ -50,7 +50,7 @@ bool initialize(android_app* app);
 
 // Functions interacting with Android native activity
 void android_main(struct android_app* state);
-void terminate();
+void terminate(void);
 void handle_cmd(android_app* app, int32_t cmd);
 
 
@@ -193,7 +193,7 @@ bool initialize(android_app* app) {
   return true;
 }
 
-void terminate() {
+void terminate(void) {
 
   vkDestroySurfaceKHR(tutorialInstance, tutorialSurface, nullptr);
   vkDestroyDevice(tutorialDevice, nullptr);
