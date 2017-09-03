@@ -1,6 +1,6 @@
 Tutorial 03 - traceable_layers
 ===============================
-This has the same functionality as tutorial02, but building the validation layers
+This has the same functionality as [Tutorial 2](../tutorial02_prebuild_layers), but building the validation layers
 from the source code inside $NDK_DIR/sources/third_party/vulkan  so application could
 trace code into layers from application. This would help in certain case developers
 want to see what validation layer is checking for application failed cases, in return
@@ -41,16 +41,16 @@ Build Instructions
 -------------------
 - import the sample into your android studio (2.2.0 beta and above)
 - check local.properties pointing to the right NDK on HOST build machine
-- select ndk-build or cmake in layerlib/build.gradle '''def USE_CMAKE = 0'''. if you are switching
+- select ndk-build or cmake in layerlib/build.gradle `def USE_CMAKE = 0`. if you are switching
 back and forth between cmake and ndk-build, before every build after switching, remove intermediate
-cached build scripts with ''' rm -fr layerlib/.external* layerlib/build app/.external* app/build'''
+cached build scripts with `rm -fr layerlib/.external* layerlib/build app/.external* app/build`
 
 known issues:
 - windows could not build layers with ndk-build usage model, working on it
 
 **Windows build extra steps**	
 if you see errors while building validation layers, try the following workaround:	
-- copy your ndk to be directly under c:\
+- copy your ndk to be directly under C:\
 - configure your ndk.dir inside local.properties to your new ndk location
 this is due to the fact that commend path is above 260 when source is inside ndk
 
