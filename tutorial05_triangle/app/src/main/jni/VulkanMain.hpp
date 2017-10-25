@@ -14,6 +14,8 @@
 #ifndef __VULKANMAIN_HPP__
 #define __VULKANMAIN_HPP__
 
+#include <android_native_app_glue.h>
+
 // Initialize vulkan device context
 // after return, vulkan is ready to draw
 bool InitVulkan(android_app* app);
