@@ -13,11 +13,13 @@
 // limitations under the License.
 
 #include "VulkanMain.hpp"
+#include <vulkan_wrapper.h>
+
 #include <android/log.h>
-#include <android_native_app_glue.h>
+
 #include <cassert>
+#include <cstring>
 #include <vector>
-#include "vulkan_wrapper.h"
 
 // Android log function wrappers
 static const char* kTAG = "Vulkan-Tutorial04";
