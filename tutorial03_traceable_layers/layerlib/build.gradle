@@ -7,17 +7,7 @@ apply plugin: 'com.android.library'
 def USE_CMAKE = 1
 
 android {
-    /*
-     * we are interested in only the debug version of layers, so ONLY publish debug version
-     * library, which will enforce building ONLY debug version, and packing only the debug
-     * version of layers. Some document is at:
-     *     https://developer.android.com/studio/build/build-variants.html
-     *     http://tools.android.com/tech-docs/new-build-system/user-guide#TOC-Library-Publication
-     */
-    publishNonDefault  true
-
     compileSdkVersion 24
-    buildToolsVersion '25.0.0'
 
     defaultConfig {
         minSdkVersion 24

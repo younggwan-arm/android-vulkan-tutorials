@@ -31,35 +31,24 @@ Refer to README.md under its directory
 
 Pre-requisites
 --------------
-- Android N device, API >= 24
-- Android Studio 2.2 beta1 or better
+- A device running Android 7.0 (API level 24) or higher
+- [Android Studio 3.0](https://developer.android.com/studio/index.html) or higher
 - Android NDK
-    * [NDK-r12](https://github.com/android-ndk/ndk/wiki), compile as is
+    * [NDK](https://developer.android.com/ndk/downloads/index.html)
     * SDK with the latest cmake package
 
 Test Matrix
 ------------
-| Andrid Studio Version | cmake in SDK| NDK      | Result  |
+| Andrid Studio Version | cmake in SDK| NDK      | device  |
 |-----------------------|-------------|----------|---------|
-| 2.2.0-beta1           | 3.6.3133135 | NDK-r12  | Yes     |
-| 2.2.0-beta1           | 3.6.3133135 | r13-beta1| NO      |
+| 3.0.0                 | 3.6.4111459 | NDK-r16  | Pixel XL|
 
 Known Issue:
- - r13-beta layer source needed to be updated
- - Studio Beta cmake 3.6.3133135 having issues with r13-beta
 
 Getting Started
 ---------------
-1. [Download Android Studio](http://tools.android.com/download/studio/canary)
-1. [Download Android NDK-R12+](https://github.com/android-ndk/ndk/wiki)
-1. [Download source code](http://www.github.com/googlesamples/android-vulkan-tutorials)
-1. Launch Android Studio.
-1. "Import Project" of the interested tutorial project to Android Studio
-1. Expand "Gradle" panel inside Android Studio, right hand edge of IDE,
-then "mathfu" --> "Tasks" --> "other" --> "get_mathfu".
-1. Select *"app"* inside Android Studio *"Project"* pane.
-1. Click *Tools/Android/Sync Project with Gradle Files*.
-1. Click *Run/Run 'app'*.
+- From the Welcome screen, select "Import Project" (or, if you already have a project open, select File > New > Import Project)
+- Navigate to the sample you downloaded and click OK
 
 License
 -------

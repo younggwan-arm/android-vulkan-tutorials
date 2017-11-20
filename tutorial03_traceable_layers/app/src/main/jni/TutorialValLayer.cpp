@@ -14,6 +14,7 @@
 #include "TutorialValLayer.hpp"
 #include <android/log.h>
 #include <cassert>
+#include <cstring>
 
 // Android log function wrappers
 static const char* kTAG = "Vulkan-Tutorial03";

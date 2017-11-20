@@ -17,6 +17,7 @@
 #include <android_native_app_glue.h>
 #include <cassert>
 #include <vector>
+#include <cstring>
 #include "vulkan_wrapper.h"
 
 // Android log function wrappers
