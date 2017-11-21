@@ -39,14 +39,14 @@ the sample here takes second approach: use a separate lib module to deal with va
 
 Build Instructions
 -------------------
-- import the sample into your android studio (2.2.0 beta and above)
+- import the sample into your android studio 3.0+
 - check local.properties pointing to the right NDK on HOST build machine
 - select ndk-build or cmake in layerlib/build.gradle `def USE_CMAKE = 0`. if you are switching
 back and forth between cmake and ndk-build, before every build after switching, remove intermediate
 cached build scripts with `rm -fr layerlib/.external* layerlib/build app/.external* app/build`
 
 known issues:
-- windows could not build layers with ndk-build usage model, working on it
+- windows could not build layers with ndk-build usage model
 
 **Windows build extra steps**	
 if you see errors while building validation layers, try the following workaround:	

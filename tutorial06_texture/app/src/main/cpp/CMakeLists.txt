@@ -44,9 +44,15 @@ target_link_libraries(vktuts native_glue log android)
 # the next 2 lines will be able to pull it into the project
 # shaderc binaries are saved on github:
 #      https://github.com/ggfan/shaderc/releases
-# the glue to reach it for CDep is in ${project_dir}/cdep.yml
+# CDep fetches the lib with config file in ${project_dir}/cdep.yml
 # ******* Most Importantly, CDep full documentation is @:
 #  https://github.com/cdep
+
+# Note: CMAKE_SYSTEM_VERSION is used in CDep lib find the min API level
+#       it is a hack for this moment, will root cause it and update accordingly.
+if (${CMAKE_SYSTEM_VERSION} LESS 24)
+  set(CMAKE_SYSTEM_VERSION 24)
+endif (${CMAKE_SYSTEM_VERSION} LESS 24)
 
 get_filename_component(cdep-dependencies_DIR
    ${CMAKE_SOURCE_DIR}/../../../../.cdep/modules  ABSOLUTE)
