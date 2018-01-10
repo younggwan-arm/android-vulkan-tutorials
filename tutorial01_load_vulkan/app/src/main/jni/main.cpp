@@ -151,6 +151,23 @@ bool initialize(android_app* app) {
   LOGI("\tallowed transforms: %x\n", surfaceCapabilities.supportedTransforms);
   LOGI("\tcomposite alpha flags: %u\n", surfaceCapabilities.currentTransform);
 
+  // Find a GFX queue family
+  uint32_t queueFamilyCount;
+  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount, nullptr);
+  assert(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount,
+                                           queueFamilyProperties.data());
+
+  uint32_t queueFamilyIndex;
+  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+       queueFamilyIndex++) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+      break;
+    }
+  }
+  assert(queueFamilyIndex < queueFamilyCount);
+
   // Create a logical device from GPU we picked
   float priorities[] = {
       1.0f,
@@ -160,7 +177,7 @@ bool initialize(android_app* app) {
       .pNext = nullptr,
       .flags = 0,
       .queueCount = 1,
-      .queueFamilyIndex = 0,
+      .queueFamilyIndex = queueFamilyIndex,
       .pQueuePriorities = priorities,
   };
 

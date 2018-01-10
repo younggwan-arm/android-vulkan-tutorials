@@ -119,6 +119,23 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   CALL_VK(vkEnumeratePhysicalDevices(device.instance_, &gpuCount, tmpGpus));
   device.gpuDevice_ = tmpGpus[0];  // Pick up the first GPU Device
 
+  // Find a GFX queue family
+  uint32_t queueFamilyCount;
+  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount, nullptr);
+  assert(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount,
+                                           queueFamilyProperties.data());
+
+  uint32_t queueFamilyIndex;
+  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+       queueFamilyIndex++) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+      break;
+    }
+  }
+  assert(queueFamilyIndex < queueFamilyCount);
+
   // Create a logical device (vulkan device)
   float priorities[] = {
       1.0f,
@@ -128,7 +145,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
       .pNext = nullptr,
       .flags = 0,
       .queueCount = 1,
-      .queueFamilyIndex = 0,
+      .queueFamilyIndex = queueFamilyIndex,
       .pQueuePriorities = priorities,
   };
 
