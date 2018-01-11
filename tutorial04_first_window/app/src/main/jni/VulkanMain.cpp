@@ -45,6 +45,7 @@ struct VulkanDeviceInfo {
   VkInstance instance_;
   VkPhysicalDevice gpuDevice_;
   VkDevice device_;
+  uint32_t queueFamilyIndex_;
 
   VkSurfaceKHR surface_;
   VkQueue queue_;
@@ -135,6 +136,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
     }
   }
   assert(queueFamilyIndex < queueFamilyCount);
+  device.queueFamilyIndex_ = queueFamilyIndex;
 
   // Create a logical device (vulkan device)
   float priorities[] = {
@@ -199,7 +201,6 @@ void CreateSwapChain(void) {
   // **********************************************************
   // Create a swap chain (here we choose the minimum available number of surface
   // in the chain)
-  uint32_t queueFamily = 0;
   VkSwapchainCreateInfoKHR swapchainCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
@@ -213,7 +214,7 @@ void CreateSwapChain(void) {
       .imageArrayLayers = 1,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 1,
-      .pQueueFamilyIndices = &queueFamily,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
       .presentMode = VK_PRESENT_MODE_FIFO_KHR,
       .oldSwapchain = VK_NULL_HANDLE,
       .clipped = VK_FALSE,

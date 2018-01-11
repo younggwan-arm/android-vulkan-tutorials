@@ -52,6 +52,7 @@ struct VulkanDeviceInfo {
   VkPhysicalDevice gpuDevice_;
   VkPhysicalDeviceMemoryProperties gpuMemoryProperties_;
   VkDevice device_;
+  uint32_t queueFamilyIndex_;
 
   VkSurfaceKHR surface_;
   VkQueue queue_;
@@ -67,6 +68,7 @@ struct VulkanSwapchainInfo {
 
   // array of frame buffers and views
   VkFramebuffer* framebuffers_;
+  VkImage* displayImages_;
   VkImageView* displayViews_;
 };
 VulkanSwapchainInfo swapchain;
@@ -114,6 +116,10 @@ VulkanRenderInfo render;
 
 // Android Native App pointer...
 android_app* androidAppCtx = nullptr;
+void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+                    VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+                    VkPipelineStageFlags srcStages,
+                    VkPipelineStageFlags destStages);
 
 // Create vulkan device
 void CreateVulkanDevice(ANativeWindow* platformWindow,
@@ -162,21 +168,23 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   // Find a GFX queue family
   uint32_t queueFamilyCount;
-  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount,
+                                           nullptr);
   assert(queueFamilyCount);
-  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount,
                                            queueFamilyProperties.data());
 
   uint32_t queueFamilyIndex;
-  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+  for (queueFamilyIndex = 0; queueFamilyIndex < queueFamilyCount;
        queueFamilyIndex++) {
-    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags &
+        VK_QUEUE_GRAPHICS_BIT) {
       break;
     }
   }
   assert(queueFamilyIndex < queueFamilyCount);
-
+  device.queueFamilyIndex_ = queueFamilyIndex;
   // Create a logical device (vulkan device)
   float priorities[] = {
       1.0f,
@@ -186,7 +194,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
       .pNext = nullptr,
       .flags = 0,
       .queueCount = 1,
-      .queueFamilyIndex = queueFamilyIndex,
+      .queueFamilyIndex = device.queueFamilyIndex_,
       .pQueuePriorities = priorities,
   };
 
@@ -240,7 +248,6 @@ void CreateSwapChain(void) {
   // **********************************************************
   // Create a swap chain (here we choose the minimum available number of surface
   // in the chain)
-  uint32_t queueFamily = 0;
   VkSwapchainCreateInfoKHR swapchainCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
@@ -254,7 +261,7 @@ void CreateSwapChain(void) {
       .imageArrayLayers = 1,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 1,
-      .pQueueFamilyIndices = &queueFamily,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
       .presentMode = VK_PRESENT_MODE_FIFO_KHR,
       .oldSwapchain = VK_NULL_HANDLE,
       .clipped = VK_FALSE,
@@ -276,6 +283,7 @@ void DeleteSwapChain(void) {
   }
   delete[] swapchain.framebuffers_;
   delete[] swapchain.displayViews_;
+  delete[] swapchain.displayImages_;
 
   vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
 }
@@ -286,9 +294,10 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
   uint32_t SwapchainImagesCount = 0;
   CALL_VK(vkGetSwapchainImagesKHR(device.device_, swapchain.swapchain_,
                                   &SwapchainImagesCount, nullptr));
-  VkImage* displayImages = new VkImage[SwapchainImagesCount];
+  swapchain.displayImages_ = new VkImage[SwapchainImagesCount];
   CALL_VK(vkGetSwapchainImagesKHR(device.device_, swapchain.swapchain_,
-                                  &SwapchainImagesCount, displayImages));
+                                  &SwapchainImagesCount,
+                                  swapchain.displayImages_));
 
   // create image view for each swapchain image
   swapchain.displayViews_ = new VkImageView[SwapchainImagesCount];
@@ -296,7 +305,7 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
     VkImageViewCreateInfo viewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
-        .image = displayImages[i],
+        .image = swapchain.displayImages_[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = swapchain.displayFormat_,
         .components =
@@ -319,7 +328,6 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
     CALL_VK(vkCreateImageView(device.device_, &viewCreateInfo, nullptr,
                               &swapchain.displayViews_[i]));
   }
-  delete[] displayImages;
 
   // create a framebuffer from each swapchain image
   swapchain.framebuffers_ = new VkFramebuffer[swapchain.swapchainLength_];
@@ -418,7 +426,9 @@ VkResult LoadTextureFromFile(const char* filePath,
       .usage = (needBlit ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                          : VK_IMAGE_USAGE_SAMPLED_BIT),
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .queueFamilyIndexCount = 0,
+      .queueFamilyIndexCount = 1,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
+      .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
       .flags = 0,
   };
   VkMemoryAllocateInfo mem_alloc = {
@@ -468,37 +478,11 @@ VkResult LoadTextureFromFile(const char* filePath,
 
   tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-  // If linear is supported, we are done
-  if (!needBlit) {
-    return VK_SUCCESS;
-  }
-
-  // save current image and mem as staging image and memory
-  VkImage stageImage = tex_obj->image;
-  VkDeviceMemory stageMem = tex_obj->mem;
-  tex_obj->image = VK_NULL_HANDLE;
-  tex_obj->mem = VK_NULL_HANDLE;
-
-  // Create a tile texture to blit into
-  image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-  image_create_info.usage =
-      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-  CALL_VK(vkCreateImage(device.device_, &image_create_info, nullptr,
-                        &tex_obj->image));
-  vkGetImageMemoryRequirements(device.device_, tex_obj->image, &mem_reqs);
-
-  mem_alloc.allocationSize = mem_reqs.size;
-  VK_CHECK(AllocateMemoryTypeFromProperties(mem_reqs.memoryTypeBits,
-                                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                            &mem_alloc.memoryTypeIndex));
-  CALL_VK(vkAllocateMemory(device.device_, &mem_alloc, nullptr, &tex_obj->mem));
-  CALL_VK(vkBindImageMemory(device.device_, tex_obj->image, tex_obj->mem, 0));
-
   VkCommandPoolCreateInfo cmdPoolCreateInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = 0,
+      .queueFamilyIndex = device.queueFamilyIndex_,
   };
 
   VkCommandPool cmdPool;
@@ -522,28 +506,73 @@ VkResult LoadTextureFromFile(const char* filePath,
       .pInheritanceInfo = nullptr};
   CALL_VK(vkBeginCommandBuffer(gfxCmd, &cmd_buf_info));
 
-  VkImageCopy bltInfo = {
-      .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .srcSubresource.mipLevel = 0,
-      .srcSubresource.baseArrayLayer = 0,
-      .srcSubresource.layerCount = 1,
-      .srcOffset.x = 0,
-      .srcOffset.y = 0,
-      .srcOffset.z = 0,
-      .dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .dstSubresource.mipLevel = 0,
-      .dstSubresource.baseArrayLayer = 0,
-      .dstSubresource.layerCount = 1,
-      .dstOffset.x = 0,
-      .dstOffset.y = 0,
-      .dstOffset.z = 0,
-      .extent.width = imgWidth,
-      .extent.height = imgHeight,
-      .extent.depth = 1,
-  };
-  vkCmdCopyImage(gfxCmd, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                 tex_obj->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                 &bltInfo);
+  // If linear is supported, we are done
+  VkImage stageImage = VK_NULL_HANDLE;
+  VkDeviceMemory stageMem = VK_NULL_HANDLE;
+  if (!needBlit) {
+    setImageLayout(gfxCmd, tex_obj->image, VK_IMAGE_LAYOUT_PREINITIALIZED,
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT,
+                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  } else {
+    // save current image and mem as staging image and memory
+    stageImage = tex_obj->image;
+    stageMem = tex_obj->mem;
+    tex_obj->image = VK_NULL_HANDLE;
+    tex_obj->mem = VK_NULL_HANDLE;
+
+    // Create a tile texture to blit into
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage =
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    CALL_VK(vkCreateImage(device.device_, &image_create_info, nullptr,
+                          &tex_obj->image));
+    vkGetImageMemoryRequirements(device.device_, tex_obj->image, &mem_reqs);
+
+    mem_alloc.allocationSize = mem_reqs.size;
+    VK_CHECK(AllocateMemoryTypeFromProperties(
+        mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &mem_alloc.memoryTypeIndex));
+    CALL_VK(
+        vkAllocateMemory(device.device_, &mem_alloc, nullptr, &tex_obj->mem));
+    CALL_VK(vkBindImageMemory(device.device_, tex_obj->image, tex_obj->mem, 0));
+
+    // transitions image out of UNDEFINED type
+    setImageLayout(gfxCmd, stageImage, VK_IMAGE_LAYOUT_PREINITIALIZED,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+    setImageLayout(gfxCmd, tex_obj->image, VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+    VkImageCopy bltInfo{
+        .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .srcSubresource.mipLevel = 0,
+        .srcSubresource.baseArrayLayer = 0,
+        .srcSubresource.layerCount = 1,
+        .srcOffset.x = 0,
+        .srcOffset.y = 0,
+        .srcOffset.z = 0,
+        .dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .dstSubresource.mipLevel = 0,
+        .dstSubresource.baseArrayLayer = 0,
+        .dstSubresource.layerCount = 1,
+        .dstOffset.x = 0,
+        .dstOffset.y = 0,
+        .dstOffset.z = 0,
+        .extent.width = imgWidth,
+        .extent.height = imgHeight,
+        .extent.depth = 1,
+    };
+    vkCmdCopyImage(gfxCmd, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   tex_obj->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                   &bltInfo);
+
+    setImageLayout(gfxCmd, tex_obj->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT,
+                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  }
 
   CALL_VK(vkEndCommandBuffer(gfxCmd));
   VkFenceCreateInfo fenceInfo = {
@@ -572,8 +601,10 @@ VkResult LoadTextureFromFile(const char* filePath,
 
   vkFreeCommandBuffers(device.device_, cmdPool, 1, &gfxCmd);
   vkDestroyCommandPool(device.device_, cmdPool, nullptr);
-  vkDestroyImage(device.device_, stageImage, nullptr);
-  vkFreeMemory(device.device_, stageMem, nullptr);
+  if (stageImage != VK_NULL_HANDLE) {
+    vkDestroyImage(device.device_, stageImage, nullptr);
+    vkFreeMemory(device.device_, stageMem, nullptr);
+  }
   return VK_SUCCESS;
 }
 
@@ -651,7 +682,6 @@ bool CreateBuffers(void) {
   };
 
   // Create a vertex buffer
-  uint32_t queueIdx = 0;
   VkBufferCreateInfo createBufferInfo{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,
@@ -659,8 +689,8 @@ bool CreateBuffers(void) {
       .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
       .flags = 0,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .pQueueFamilyIndices = &queueIdx,
       .queueFamilyIndexCount = 1,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
   };
 
   CALL_VK(vkCreateBuffer(device.device_, &createBufferInfo, nullptr,
@@ -1087,6 +1117,14 @@ bool InitVulkan(android_app* app) {
     CALL_VK(vkBeginCommandBuffer(render.cmdBuffer_[bufferIndex],
                                  &cmdBufferBeginInfo));
 
+    // transition the buffer into color attachment
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   swapchain.displayImages_[bufferIndex],
+                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
     // Now we start a renderpass. Any draw command has to be recorded in a
     // renderpass
     VkClearValue clearVals{
@@ -1095,6 +1133,7 @@ bool InitVulkan(android_app* app) {
         .color.float32[2] = 0.90f,
         .color.float32[3] = 1.0f,
     };
+
     VkRenderPassBeginInfo renderPassBeginInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = nullptr,
@@ -1123,6 +1162,12 @@ bool InitVulkan(android_app* app) {
     vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
 
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   swapchain.displayImages_[bufferIndex],
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
   }
 
@@ -1210,4 +1255,75 @@ bool VulkanDrawFrame(void) {
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
   return true;
+}
+
+void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+                    VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+                    VkPipelineStageFlags srcStages,
+                    VkPipelineStageFlags destStages) {
+  VkImageMemoryBarrier imageMemoryBarrier = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .pNext = NULL,
+      .srcAccessMask = 0,
+      .dstAccessMask = 0,
+      .oldLayout = oldImageLayout,
+      .newLayout = newImageLayout,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = image,
+      .subresourceRange =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel = 0,
+              .levelCount = 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+  };
+
+  switch (oldImageLayout) {
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+      break;
+
+    default:
+      break;
+  }
+
+  switch (newImageLayout) {
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask =
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      break;
+
+    default:
+      break;
+  }
+
+  vkCmdPipelineBarrier(cmdBuffer, srcStages, destStages, 0, 0, NULL, 0, NULL, 1,
+                       &imageMemoryBarrier);
 }
