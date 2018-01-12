@@ -46,6 +46,7 @@ struct VulkanDeviceInfo {
   VkInstance instance_;
   VkPhysicalDevice gpuDevice_;
   VkDevice device_;
+  uint32_t queueFamilyIndex_;
 
   VkSurfaceKHR surface_;
   VkQueue queue_;
@@ -148,6 +149,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
     }
   }
   assert(queueFamilyIndex < queueFamilyCount);
+  device.queueFamilyIndex_ = queueFamilyIndex;
 
   // Create a logical device (vulkan device)
   float priorities[] = {
@@ -212,7 +214,6 @@ void CreateSwapChain(void) {
   // **********************************************************
   // Create a swap chain (here we choose the minimum available number of surface
   // in the chain)
-  uint32_t queueFamily = 0;
   VkSwapchainCreateInfoKHR swapchainCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
@@ -226,7 +227,7 @@ void CreateSwapChain(void) {
       .imageArrayLayers = 1,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 1,
-      .pQueueFamilyIndices = &queueFamily,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
       .presentMode = VK_PRESENT_MODE_FIFO_KHR,
       .oldSwapchain = VK_NULL_HANDLE,
       .clipped = VK_FALSE,
@@ -347,15 +348,14 @@ bool CreateBuffers(void) {
   };
 
   // Create a vertex buffer
-  uint32_t queueIdx = 0;
-  VkBufferCreateInfo createBufferInfo{
+  VkBufferCreateInfo createBufferInfo {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,
       .size = sizeof(vertexData),
       .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
       .flags = 0,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .pQueueFamilyIndices = &queueIdx,
+      .pQueueFamilyIndices = &device.queueFamilyIndex_,
       .queueFamilyIndexCount = 1,
   };
 
@@ -697,11 +697,11 @@ bool InitVulkan(android_app* app) {
 
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
-  VkCommandPoolCreateInfo cmdPoolCreateInfo{
+  VkCommandPoolCreateInfo cmdPoolCreateInfo {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = 0,
+      .queueFamilyIndex = device.queueFamilyIndex_,
   };
   CALL_VK(vkCreateCommandPool(device.device_, &cmdPoolCreateInfo, nullptr,
                               &render.cmdPool_));
