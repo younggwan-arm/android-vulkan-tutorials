@@ -60,8 +60,9 @@ struct VulkanSwapchainInfo {
   VkFormat displayFormat_;
 
   // array of frame buffers and views
-  VkFramebuffer* framebuffers_;
-  VkImageView* displayViews_;
+  std::vector<VkImage> displayImages_;
+  std::vector<VkImageView> displayViews_;
+  std::vector<VkFramebuffer> framebuffers_;
 };
 VulkanSwapchainInfo swapchain;
 
@@ -77,6 +78,15 @@ VulkanRenderInfo render;
 
 // Android Native App pointer...
 android_app* androidAppCtx = nullptr;
+
+/*
+ * setImageLayout():
+ *    Helper function to transition color buffer layout
+ */
+void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+                    VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+                    VkPipelineStageFlags srcStages,
+                    VkPipelineStageFlags destStages);
 
 // Create vulkan device
 void CreateVulkanDevice(ANativeWindow* platformWindow,
@@ -122,16 +132,18 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   // Find a GFX queue family
   uint32_t queueFamilyCount;
-  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount,
+                                           nullptr);
   assert(queueFamilyCount);
-  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(device.gpuDevice_, &queueFamilyCount,
                                            queueFamilyProperties.data());
 
   uint32_t queueFamilyIndex;
-  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+  for (queueFamilyIndex = 0; queueFamilyIndex < queueFamilyCount;
        queueFamilyIndex++) {
-    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags &
+        VK_QUEUE_GRAPHICS_BIT) {
       break;
     }
   }
@@ -165,7 +177,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   CALL_VK(vkCreateDevice(device.gpuDevice_, &deviceCreateInfo, nullptr,
                          &device.device_));
-  vkGetDeviceQueue(device.device_, 0, 0, &device.queue_);
+  vkGetDeviceQueue(device.device_, device.queueFamilyIndex_, 0, &device.queue_);
 }
 
 void CreateSwapChain(void) {
@@ -233,10 +245,8 @@ void DeleteSwapChain(void) {
   for (int i = 0; i < swapchain.swapchainLength_; i++) {
     vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
     vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
+    vkDestroyImage(device.device_, swapchain.displayImages_[i], nullptr);
   }
-  delete[] swapchain.framebuffers_;
-  delete[] swapchain.displayViews_;
-
   vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
 }
 
@@ -246,17 +256,18 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
   uint32_t SwapchainImagesCount = 0;
   CALL_VK(vkGetSwapchainImagesKHR(device.device_, swapchain.swapchain_,
                                   &SwapchainImagesCount, nullptr));
-  VkImage* displayImages = new VkImage[SwapchainImagesCount];
+  swapchain.displayImages_.resize(SwapchainImagesCount);
   CALL_VK(vkGetSwapchainImagesKHR(device.device_, swapchain.swapchain_,
-                                  &SwapchainImagesCount, displayImages));
+                                  &SwapchainImagesCount,
+                                  swapchain.displayImages_.data()));
 
   // create image view for each swapchain image
-  swapchain.displayViews_ = new VkImageView[SwapchainImagesCount];
+  swapchain.displayViews_.resize(SwapchainImagesCount);
   for (uint32_t i = 0; i < SwapchainImagesCount; i++) {
     VkImageViewCreateInfo viewCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
-        .image = displayImages[i],
+        .image = swapchain.displayImages_[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = swapchain.displayFormat_,
         .components =
@@ -279,10 +290,9 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
     CALL_VK(vkCreateImageView(device.device_, &viewCreateInfo, nullptr,
                               &swapchain.displayViews_[i]));
   }
-  delete[] displayImages;
 
   // create a framebuffer from each swapchain image
-  swapchain.framebuffers_ = new VkFramebuffer[swapchain.swapchainLength_];
+  swapchain.framebuffers_.resize(swapchain.swapchainLength_);
   for (uint32_t i = 0; i < swapchain.swapchainLength_; i++) {
     VkImageView attachments[2] = {
         swapchain.displayViews_[i], depthView,
@@ -412,7 +422,13 @@ bool InitVulkan(android_app* app) {
     };
     CALL_VK(vkBeginCommandBuffer(render.cmdBuffer_[bufferIndex],
                                  &cmdBufferBeginInfo));
-
+    // transition the display image to color attachment layout
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   swapchain.displayImages_[bufferIndex],
+                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     // Now we start a renderpass. Any draw command has to be recorded in a
     // renderpass
     VkClearValue clearVals{
@@ -438,6 +454,13 @@ bool InitVulkan(android_app* app) {
     // Do more drawing !
 
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
+    // transition back to swapchain image to PRESENT_SRC_KHR
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   swapchain.displayImages_[bufferIndex],
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
   }
 
@@ -519,4 +542,79 @@ bool VulkanDrawFrame(void) {
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
   return true;
+}
+
+/*
+ * setImageLayout():
+ *    Helper function to transition color buffer layout
+ */
+void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+                    VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+                    VkPipelineStageFlags srcStages,
+                    VkPipelineStageFlags destStages) {
+  VkImageMemoryBarrier imageMemoryBarrier = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .pNext = NULL,
+      .srcAccessMask = 0,
+      .dstAccessMask = 0,
+      .oldLayout = oldImageLayout,
+      .newLayout = newImageLayout,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = image,
+      .subresourceRange =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel = 0,
+              .levelCount = 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+  };
+
+  switch (oldImageLayout) {
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+      imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+      break;
+
+    default:
+      break;
+  }
+
+  switch (newImageLayout) {
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      break;
+
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      imageMemoryBarrier.dstAccessMask =
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      break;
+
+    default:
+      break;
+  }
+
+  vkCmdPipelineBarrier(cmdBuffer, srcStages, destStages, 0, 0, NULL, 0, NULL, 1,
+                       &imageMemoryBarrier);
 }
