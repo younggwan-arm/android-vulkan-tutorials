@@ -383,7 +383,8 @@ bool CreateBuffers(void) {
 
   // Assign the proper memory type for that buffer
   MapMemoryTypeToIndex(memReq.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                        &allocInfo.memoryTypeIndex);
 
   // Allocate memory for the buffer
