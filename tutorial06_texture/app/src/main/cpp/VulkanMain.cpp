@@ -702,12 +702,11 @@ bool CreateBuffers(void) {
   VkMemoryAllocateInfo allocInfo{
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
       .pNext = nullptr,
-      .allocationSize = sizeof(vertexData),
+      .allocationSize = memReq.size,
       .memoryTypeIndex = 0,  // Memory type assigned in the next step
   };
 
   // Assign the proper memory type for that buffer
-  allocInfo.allocationSize = memReq.size;
   MapMemoryTypeToIndex(memReq.memoryTypeBits,
                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
                        &allocInfo.memoryTypeIndex);
