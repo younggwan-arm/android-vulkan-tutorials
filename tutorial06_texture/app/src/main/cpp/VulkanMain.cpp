@@ -717,8 +717,8 @@ bool CreateBuffers(void) {
   CALL_VK(vkAllocateMemory(device.device_, &allocInfo, nullptr, &deviceMemory));
 
   void* data;
-  CALL_VK(vkMapMemory(device.device_, deviceMemory, 0, sizeof(vertexData), 0,
-                      &data));
+  CALL_VK(vkMapMemory(device.device_, deviceMemory, 0, allocInfo.allocationSize,
+                      0, &data));
   memcpy(data, vertexData, sizeof(vertexData));
   vkUnmapMemory(device.device_, deviceMemory);
 
