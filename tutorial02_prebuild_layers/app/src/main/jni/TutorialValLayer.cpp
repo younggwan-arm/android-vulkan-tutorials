@@ -63,23 +63,23 @@ static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
     uint64_t object, size_t location, int32_t messageCode,
     const char* pLayerPrefix, const char* pMessage, void* pUserData) {
   if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_INFO, "Vulkan Debug Message: ", "%s -- %s",
+    __android_log_print(ANDROID_LOG_INFO, "Vulkan-Debug-Message: ", "%s -- %s",
                         pLayerPrefix, pMessage);
   }
   if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_WARN, "Vulkan Debug Message: ", "%s -- %s",
+    __android_log_print(ANDROID_LOG_WARN, "Vulkan-Debug-Message: ", "%s -- %s",
                         pLayerPrefix, pMessage);
   }
   if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_WARN, "Vulkan Debug Message (Perf): ",
+    __android_log_print(ANDROID_LOG_WARN, "Vulkan-Debug-Message-(Perf): ",
                         "%s -- %s", pLayerPrefix, pMessage);
   }
   if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_ERROR, "Vulkan Debug Message: ", "%s -- %s",
+    __android_log_print(ANDROID_LOG_ERROR, "Vulkan-Debug-Message: ", "%s -- %s",
                         pLayerPrefix, pMessage);
   }
   if (flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_DEBUG, "Vulkan Debug Message: ", "%s -- %s",
+    __android_log_print(ANDROID_LOG_DEBUG, "Vulkan-Debug-Message: ", "%s -- %s",
                         pLayerPrefix, pMessage);
   }
 
