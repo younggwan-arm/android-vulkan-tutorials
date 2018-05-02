@@ -377,14 +377,14 @@ bool CreateBuffers(void) {
   VkMemoryAllocateInfo allocInfo{
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
       .pNext = nullptr,
-      .allocationSize = sizeof(vertexData),
+      .allocationSize = memReq.size,
       .memoryTypeIndex = 0,  // Memory type assigned in the next step
   };
 
   // Assign the proper memory type for that buffer
-  allocInfo.allocationSize = memReq.size;
   MapMemoryTypeToIndex(memReq.memoryTypeBits,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                        &allocInfo.memoryTypeIndex);
 
   // Allocate memory for the buffer
@@ -392,8 +392,8 @@ bool CreateBuffers(void) {
   CALL_VK(vkAllocateMemory(device.device_, &allocInfo, nullptr, &deviceMemory));
 
   void* data;
-  CALL_VK(vkMapMemory(device.device_, deviceMemory, 0, sizeof(vertexData), 0,
-                      &data));
+  CALL_VK(vkMapMemory(device.device_, deviceMemory, 0, allocInfo.allocationSize,
+                      0, &data));
   memcpy(data, vertexData, sizeof(vertexData));
   vkUnmapMemory(device.device_, deviceMemory);
 
@@ -418,6 +418,7 @@ VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
   char* fileContent = new char[fileLength];
 
   AAsset_read(file, fileContent, fileLength);
+  AAsset_close(file);
 
   VkShaderModuleCreateInfo shaderModuleCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
