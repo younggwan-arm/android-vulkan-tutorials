@@ -418,6 +418,7 @@ VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
   char* fileContent = new char[fileLength];
 
   AAsset_read(file, fileContent, fileLength);
+  AAsset_close(file);
 
   VkShaderModuleCreateInfo shaderModuleCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

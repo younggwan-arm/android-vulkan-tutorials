@@ -401,6 +401,7 @@ VkResult LoadTextureFromFile(const char* filePath,
   size_t fileLength = AAsset_getLength(file);
   stbi_uc* fileContent = new unsigned char[fileLength];
   AAsset_read(file, fileContent, fileLength);
+  AAsset_close(file);
 
   uint32_t imgWidth, imgHeight, n;
   unsigned char* imageData = stbi_load_from_memory(
