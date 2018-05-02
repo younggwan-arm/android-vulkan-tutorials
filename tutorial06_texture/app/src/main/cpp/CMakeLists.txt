@@ -46,14 +46,7 @@ target_link_libraries(vktuts native_glue log android)
 #      https://github.com/ggfan/shaderc/releases
 # CDep fetches the lib with config file in ${project_dir}/cdep.yml
 # ******* Most Importantly, CDep full documentation is @:
-#  https://github.com/cdep
-
-# Note: CMAKE_SYSTEM_VERSION is used in CDep lib find the min API level
-#       it is a hack for this moment, will root cause it and update accordingly.
-if (${CMAKE_SYSTEM_VERSION} LESS 24)
-  set(CMAKE_SYSTEM_VERSION 24)
-endif (${CMAKE_SYSTEM_VERSION} LESS 24)
-
+#  https://github.com/google/cdep
 get_filename_component(cdep-dependencies_DIR
    ${CMAKE_SOURCE_DIR}/../../../../.cdep/modules  ABSOLUTE)
 find_package(cdep-dependencies REQUIRED)
