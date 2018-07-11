@@ -223,6 +223,11 @@ void CreateSwapChain(void) {
   swapchain.displaySize_ = surfaceCapabilities.currentExtent;
   swapchain.displayFormat_ = formats[chosenFormat].format;
 
+  VkSurfaceCapabilitiesKHR surfaceCap;
+  CALL_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.gpuDevice_,
+                                                    device.surface_, &surfaceCap));
+  assert(surfaceCap.supportedCompositeAlpha | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR);
+
   // **********************************************************
   // Create a swap chain (here we choose the minimum available number of surface
   // in the chain)
@@ -240,6 +245,7 @@ void CreateSwapChain(void) {
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 1,
       .pQueueFamilyIndices = &device.queueFamilyIndex_,
+      .compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
       .presentMode = VK_PRESENT_MODE_FIFO_KHR,
       .oldSwapchain = VK_NULL_HANDLE,
       .clipped = VK_FALSE,
@@ -451,13 +457,6 @@ VkResult CreateGraphicsPipeline(void) {
   CALL_VK(vkCreatePipelineLayout(device.device_, &pipelineLayoutCreateInfo,
                                  nullptr, &gfxPipeline.layout_));
 
-  // No dynamic state in that tutorial
-  VkPipelineDynamicStateCreateInfo dynamicStateInfo = {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-      .pNext = nullptr,
-      .dynamicStateCount = 0,
-      .pDynamicStates = nullptr};
-
   VkShaderModule vertexShader, fragmentShader;
   loadShaderFromFile("shaders/tri.vert.spv", &vertexShader, VERTEX_SHADER);
   loadShaderFromFile("shaders/tri.frag.spv", &fragmentShader, FRAGMENT_SHADER);
@@ -604,7 +603,7 @@ VkResult CreateGraphicsPipeline(void) {
       .pMultisampleState = &multisampleInfo,
       .pDepthStencilState = nullptr,
       .pColorBlendState = &colorBlendInfo,
-      .pDynamicState = &dynamicStateInfo,
+      .pDynamicState = nullptr,
       .layout = gfxPipeline.layout_,
       .renderPass = render.renderPass_,
       .subpass = 0,
@@ -745,7 +744,7 @@ bool InitVulkan(android_app* app) {
     // transition the display image to color attachment layout
     setImageLayout(render.cmdBuffer_[bufferIndex],
                    swapchain.displayImages_[bufferIndex],
-                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_IMAGE_LAYOUT_UNDEFINED,
                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
@@ -783,13 +782,7 @@ bool InitVulkan(android_app* app) {
     vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
 
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
-    // transition back to swapchain image to PRESENT_SRC_KHR
-    setImageLayout(render.cmdBuffer_[bufferIndex],
-                   swapchain.displayImages_[bufferIndex],
-                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+
     CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
   }
 
@@ -944,6 +937,9 @@ void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
       imageMemoryBarrier.dstAccessMask =
           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+      imageMemoryBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
       break;
 
     default:
