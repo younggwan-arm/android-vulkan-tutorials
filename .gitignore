@@ -7,5 +7,6 @@ build
 local.properties
 .externalNativeBuild
 .cdep
+cdep.sha256
 
 

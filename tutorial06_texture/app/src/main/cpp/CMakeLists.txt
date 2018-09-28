@@ -26,7 +26,8 @@ target_include_directories(vktuts PRIVATE
    ${ANDROID_NDK}/sources/android/native_app_glue)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-   -std=c++11 -Werror -Wno-unused-variable -DVK_USE_PLATFORM_ANDROID_KHR")
+       -std=c++11 -Werror -Wno-unused-variable \
+       -Wno-delete-non-virtual-dtor -DVK_USE_PLATFORM_ANDROID_KHR")
 
 if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
    set(CMAKE_CXX_FLAGS} "${CMAKE_CXX_FLAGS} \
