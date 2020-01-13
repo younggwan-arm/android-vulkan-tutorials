@@ -17,7 +17,7 @@ android {
         ndk.abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         externalNativeBuild {
             if (USE_CMAKE) {
-                cmake.arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=gnustl_static'
+                cmake.arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
             } else {
                 ndkBuild.arguments 'NDK_DEBUG=1'
             }

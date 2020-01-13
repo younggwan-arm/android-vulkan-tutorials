@@ -6,6 +6,7 @@ build
 *~
 local.properties
 .externalNativeBuild
+.cxx
 .cdep
 cdep.sha256
 
