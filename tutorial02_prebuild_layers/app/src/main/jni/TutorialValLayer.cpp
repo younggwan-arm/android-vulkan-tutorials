@@ -33,28 +33,14 @@ static const char* kTAG = "Vulkan-Tutorial02";
     assert(false);                                                    \
   }
 
-/*
- * Validation Layer names at this time (info purpose)
-   static const char*  kValLayerNames[] = {
-        "VK_LAYER_GOOGLE_threading",
-        "VK_LAYER_LUNARG_device_limits",
-        "VK_LAYER_LUNARG_core_validation",
-        "VK_LAYER_LUNARG_image",
-        "VK_LAYER_LUNARG_object_tracker",
-        "VK_LAYER_LUNARG_parameter_validation",
-        "VK_LAYER_LUNARG_swapchain",
-        "VK_LAYER_GOOGLE_unique_objects",
-   };
+/**
+ * Validation Layer name
 */
-static const char* kUniqueObjectLayer = "VK_LAYER_GOOGLE_unique_objects";
-static const char* kGoogleThreadingLayer = "VK_LAYER_GOOGLE_threading";
+static const char * kValLayerName = "VK_LAYER_KHRONOS_validation";
 
-// Debug Extension names in use.
-// assumed usage:
-//   1) app calls GetDbgExtName()
-//   2) app calls IsExtSupported() to make sure it is supported
-//   3) app tucks dbg extension name into InstanceCreateInfo to create instance
-//   4) app calls CreateDbgExtCallback() to hook up debug print message
+/**
+ * Debug Extension names in use.
+ */
 static const char* kDbgExtName = "VK_EXT_debug_report";
 
 // Simple Dbg Callback function to be used by Vk engine
@@ -62,6 +48,8 @@ static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
     VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
     uint64_t object, size_t location, int32_t messageCode,
     const char* pLayerPrefix, const char* pMessage, void* pUserData) {
+
+  // pUserData is not usable as we did not set it up when we were registering the callback
   if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
     __android_log_print(ANDROID_LOG_INFO, "Vulkan-Debug-Message: ", "%s -- %s",
                         pLayerPrefix, pMessage);
@@ -85,104 +73,155 @@ static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
 
   return VK_FALSE;
 }
-// Reinforce the layer name sequence to meet load sequence
-// requirement if there is any
-void LayerAndExtensions::CheckLayerLoadingSequence(
-    std::vector<char*>* layerPtr) {
-  // VK_LAYER_GOOGLE_unique_objects need to be after
-  // VK_LAYER_LUNARG_core_validation
-  // VK_GOOGLE_THREADING_LAYER better to be the very first one
-  std::vector<char*>& layers = *layerPtr;
-  uint32_t uniqueObjIdx = -1;
-  uint32_t threadingIdx = -1;
-  uint32_t size = layers.size();
-  for (uint32_t idx = 0; idx < size; ++idx) {
-    if (!strcmp(layers[idx], kUniqueObjectLayer)) uniqueObjIdx = idx;
-    if (!strcmp(layers[idx], kGoogleThreadingLayer)) threadingIdx = idx;
-  }
-  if (uniqueObjIdx != -1) {
-    char* tmp = layers[uniqueObjIdx];
-    layers[uniqueObjIdx] = layers[size - 1];
-    layers[size - 1] = tmp;
-  }
 
-  if (threadingIdx != -1) {
-    char* tmp = layers[threadingIdx];
-    layers[threadingIdx] = layers[0];
-    layers[0] = tmp;
-  }
+/**
+ * Helper function cloneString(): allocation and copy a string,
+ * src is never null.
+ */
+static char* cloneString(const char* src) {
+  char* dst = new char[strlen(src) + 1];
+  strcpy(dst, src);
+  return dst;
 }
 
-bool LayerAndExtensions::InitExtNames(const std::vector<ExtInfo>& prop,
-                                      std::vector<char*>* names) {
-  names->clear();
-  for (auto& ext : prop) {
-    for (uint32_t i = 0; i < ext.count; ++i) {
-      // skip the one already inside
-      bool duplicate = false;
-      for (uint32_t j = 0; j < names->size(); ++j) {
-        if (!strcmp(ext.prop[i].extensionName, (*names)[j])) {
-          duplicate = true;
-          break;
-        }
-      }
-      if (duplicate) continue;
-      // save this unique one
-      names->push_back(ext.prop[i].extensionName);
-      LOGI("Ext name: %s", ext.prop[i].extensionName);
+/**
+* Helper function AddExtNames():
+*   move extension names in the given properties array into extension cache.
+*/
+static bool addExtNames(std::vector<char*>& extStore, uint32_t count,
+                                     VkExtensionProperties* properties) {
+    if(!properties)
+        return false;
+    for(uint32_t i = 0; i < count; i++) {
+        char* name = cloneString(properties[i].extensionName);
+        extStore.push_back(name);
     }
-  }
-  return true;
+    return true;
 }
 
-bool LayerAndExtensions::InitInstExts(void) {
-  ExtInfo extInfo{0, nullptr};
-  CALL_VK(
-      vkEnumerateInstanceExtensionProperties(nullptr, &extInfo.count, nullptr));
-  if (extInfo.count) {
-    extInfo.prop = new VkExtensionProperties[extInfo.count];
-    assert(extInfo.prop);
-    CALL_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extInfo.count,
-                                                   extInfo.prop));
-    instExtProp_.push_back(extInfo);
+
+/**
+ * Constructor: initialize layer cache
+ */
+LayerAndExtensions::LayerAndExtensions(void) {
+  layersCache_.clear();
+  extCache_.clear();
+
+  // Retrieve instance extensions from the underline Vulkan implementation
+  std::vector<char*> extNames;
+  uint32_t count = 0;
+  CALL_VK(vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr));
+  if (count) {
+    VkExtensionProperties* prop = new VkExtensionProperties[count];
+    CALL_VK(vkEnumerateInstanceExtensionProperties(nullptr, &count,
+                                                   prop));
+    addExtNames(extNames, count, prop);
+    delete [] prop;
   }
 
-  for (int i = 0; i < instLayerCount_; i++) {
-    extInfo.count = 0;
-    CALL_VK(vkEnumerateInstanceExtensionProperties(instLayerProp_[i].layerName,
-                                                   &extInfo.count, nullptr));
-    if (extInfo.count == 0) continue;
-    extInfo.prop = new VkExtensionProperties[extInfo.count];
-    CALL_VK(vkEnumerateInstanceExtensionProperties(
-        instLayerProp_[i].layerName, &extInfo.count, extInfo.prop));
-    instExtProp_.push_back(extInfo);
+  uint32_t layerCount;
+  VkLayerProperties* layerProp = nullptr;
+  CALL_VK(vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
+  if (layerCount) {
+    layerProp = new VkLayerProperties[layerCount];
+    CALL_VK(vkEnumerateInstanceLayerProperties(&layerCount, layerProp));
   }
-  return InitExtNames(instExtProp_, &instExts_);
+  std::vector<char*> layers;
+  for (uint32_t i = 0; i < layerCount; i++) {
+    char* name = cloneString(layerProp[i].layerName);
+    layers.push_back(name);
+    LOGI("instanceLayer name: %s", name);
+
+    CALL_VK(vkEnumerateInstanceExtensionProperties(name, &count, nullptr));
+    if (count == 0) continue;
+
+    VkExtensionProperties* prop = new VkExtensionProperties[count];
+    CALL_VK(vkEnumerateInstanceExtensionProperties(name, &count, prop));
+    addExtNames(extNames, count, prop);
+    delete [] prop;
+  }
+  layersCache_[VK_NULL_HANDLE] = layers;
+  extCache_[VK_NULL_HANDLE] = extNames;
+
+  if (layerProp) delete [] layerProp;
 }
 
-char** LayerAndExtensions::InstLayerNames(void) {
-  if (instLayers_.size()) {
-    return static_cast<char**>(instLayers_.data());
+/**
+ * Report available layer names
+ * @return: an array of layer name pointers, NULL if no layers are available
+ */
+char** LayerAndExtensions::getLayerNames(void) {
+  auto layers = layersCache_.find(VK_NULL_HANDLE);
+  if(layers == layersCache_.end() || layers->second.empty()) {
+    return nullptr;
   }
-  return nullptr;
-}
-uint32_t LayerAndExtensions::InstLayerCount(void) {
-  LOGI("InstLayerCount = %d", static_cast<int32_t>(instLayers_.size()));
-  return static_cast<int32_t>(instLayers_.size());
-}
-char** LayerAndExtensions::InstExtNames(void) {
-  if (instExts_.size()) {
-    return static_cast<char**>(instExts_.data());
-  }
-  return nullptr;
-}
-uint32_t LayerAndExtensions::InstExtCount(void) {
-  LOGI("InstExtCount: %d", static_cast<uint32_t>(instExts_.size()));
-  return static_cast<uint32_t>(instExts_.size());
+
+  return static_cast<char**>(layers->second.data());
 }
 
-bool LayerAndExtensions::IsInstExtSupported(const char* extName) {
-  for (auto name : instExts_) {
+/**
+ * Report out available layers on the system + inside APK's native libs
+ * @return available layers for the instance.
+ */
+uint32_t LayerAndExtensions::getLayerCount(void) {
+  uint32_t count = 0;
+  auto layers = layersCache_.find(VK_NULL_HANDLE);
+  if(layers == layersCache_.end()) {
+    return count;
+  }
+
+  count = layers->second.size();
+  LOGI("InstLayerCount = %d", count);
+  return count;
+}
+
+char** LayerAndExtensions::getExtensionNames(ExtensionType type, void* handle) {
+  if (type == ExtensionType::LAYER_EXTENSION) {
+    assert(handle == VK_NULL_HANDLE);
+  } else {
+    initDevExtensions(handle);
+  }
+  auto it = extCache_.find(handle);
+  if( it == extCache_.end() || it->second.empty()) {
+    LOGE("No cache for %p in %s", handle, __FUNCTION__);
+    return nullptr;
+  }
+
+  return static_cast<char**>(it->second.data());
+}
+
+/**
+ * Query for the available extensions, including the ones inside available layers
+ * @param type one of ExtensionType enums
+ * @param handle either VK_NULL_HANDLE for instance extensions, or physical device handles
+ * @return available extensions for the queried type.
+ */
+uint32_t LayerAndExtensions::getExtensionCount(ExtensionType type, void* handle) {
+  if (type == ExtensionType::LAYER_EXTENSION) {
+    assert(handle == VK_NULL_HANDLE);
+  } else {
+    initDevExtensions(handle);
+  }
+  auto it = extCache_.find(handle);
+  if( it == extCache_.end()) {
+    LOGE("No cache for %p in %s", handle, __FUNCTION__);
+    return 0;
+  }
+  return static_cast<uint32_t>(it->second.size());
+}
+
+bool LayerAndExtensions::isExtensionSupported(ExtensionType type, void* handle, const char* extName) {
+  if (type == ExtensionType::LAYER_EXTENSION) {
+    assert(handle == VK_NULL_HANDLE);
+  } else {
+    initDevExtensions(handle);
+  }
+  auto it = extCache_.find(handle);
+  if(it == extCache_.end()) {
+    LOGE("No cache for %p in %s", handle, __FUNCTION__);
+    return false;
+  }
+  for (auto name : it->second) {
     if (!strcmp(name, extName)) {
       return true;
     }
@@ -190,148 +229,140 @@ bool LayerAndExtensions::IsInstExtSupported(const char* extName) {
   return false;
 }
 
-bool LayerAndExtensions::AddInstanceExt(const char* extName) {
-  if (!extName) return false;
+/**
+ * Check whether the layer is supported. layers are common to instance and devices, this
+ * simply check whether the given layer name is inside the pre-built layerCache_
+ * @param layerName the layer to check for supportability
+ * @return true: supported, false: otherwise
+ */
+bool LayerAndExtensions::isLayerSupported(const char* layerName) {
+  auto layers = layersCache_.find(VK_NULL_HANDLE);
+  if (layers == layersCache_.end()) {
+     // Internal cache is not built up, due to no layers found.
+     return false;
+  }
 
-  // enable all available extensions, plus the one asked
-  if (!IsInstExtSupported(extName)) {
-#ifdef ENABLE_NON_ENUMERATED_EXT
-    instExts.push_back(static_cast<char*>(extName));
-    instExtCount++;
-    return true;
-#else
-    return false;
-#endif
+  // check for supportability
+  for (auto name : layers->second) {
+    if (!strcmp(name, layerName))
+      return true;
   }
-  return true;
-}
-bool LayerAndExtensions::IsInstLayerSupported(const char* layerName) {
-  InstLayerNames();
-  for (auto name : instLayers_) {
-    if (!strcmp(name, layerName)) return true;
-  }
+
   return false;
 }
 
-LayerAndExtensions::LayerAndExtensions(void) {
-  instance_ = VK_NULL_HANDLE;
-  vkCallbackHandle_ = VK_NULL_HANDLE;
-  CALL_VK(vkEnumerateInstanceLayerProperties(&instLayerCount_, nullptr));
-  if (instLayerCount_) {
-    instLayerProp_ = new VkLayerProperties[instLayerCount_];
-    assert(instLayerProp_);
-    CALL_VK(
-        vkEnumerateInstanceLayerProperties(&instLayerCount_, instLayerProp_));
+/**
+ * Build up device extension cache, add to extCache_. Cache only gets built once.
+ * @param device VkPhysicalDevice
+ */
+void LayerAndExtensions::initDevExtensions(void* device) {
+  auto it = extCache_.find(device);
+  if (it != extCache_.end()) {
+    // already in cache, no need to re-build.
+    return;
   }
-  for (uint32_t i = 0; i < instLayerCount_; i++) {
-    instLayers_.push_back(instLayerProp_[i].layerName);
-    LOGI("InstLayer name: %s", instLayerProp_[i].layerName);
-  }
-  CheckLayerLoadingSequence(&instLayers_);
-
-  InitInstExts();
-}
-
-LayerAndExtensions::~LayerAndExtensions() {
-  if (instLayerProp_) {
-    delete[] instLayerProp_;
-  }
-  for (auto ext : instExtProp_) {
-    delete[] ext.prop;
-  }
-  if (vkCallbackHandle_) {
-    vkDestroyDebugReportCallbackEXT(instance_, vkCallbackHandle_, nullptr);
-  }
-}
-
-void LayerAndExtensions::InitDevLayersAndExt(VkPhysicalDevice physicalDevice) {
-  physicalDev_ = physicalDevice;
-  if (physicalDev_ == VK_NULL_HANDLE) return;
+  VkPhysicalDevice physicalDev = reinterpret_cast<VkPhysicalDevice>(device);
 
   // get all supported layers props
-  devLayerCount_ = 0;
+  uint32_t count = 0;
+  VkLayerProperties *properties = nullptr;
   CALL_VK(
-      vkEnumerateDeviceLayerProperties(physicalDev_, &devLayerCount_, nullptr));
-  if (devLayerCount_) {
-    devLayerProp_ = new VkLayerProperties[devLayerCount_];
-    assert(devLayerProp_);
-    CALL_VK(vkEnumerateDeviceLayerProperties(physicalDev_, &devLayerCount_,
-                                             devLayerProp_));
+      vkEnumerateDeviceLayerProperties(physicalDev, &count, nullptr));
+  if (count) {
+    properties = new VkLayerProperties[count];
+    CALL_VK(vkEnumerateDeviceLayerProperties(physicalDev, &count, properties));
   }
 
-#ifdef LOADER_DEVICE_LAYER_REPORT_BUG_WA
-  // validation layer for device only report out for one layer,
-  // but it seems we could ask for all layers that asked for instance
-  // so we just add them all in brutally
-  // assume all device layers are also implemented for device layers
-  if (devLayerCount_ == 1) {
-    LOGI("Only Reported One layer for device");
-    if (devLayerProp_) delete[] devLayerProp_;
-    devLayerProp_ =
-        (instLayerCount_ ? (new VkLayerProperties[instLayerCount_]) : nullptr);
-    memcpy(devLayerProp_, instLayerProp_,
-           instLayerCount_ * sizeof(VkLayerProperties));
-    devLayerCount_ = instLayerCount_;
-  }
-#endif
+  // Retrieve names from layers and cache them.
+  std::vector<char*> layerNames;
+  std::vector<char*> extNames;
+  for (int i = 0; i < count; i++) {
+    LOGI("layerName: %s for device %p", properties[i].layerName, physicalDev);
+    char* name = cloneString(properties[i].layerName);
+    layerNames.push_back(name);
 
-  for (int i = 0; i < devLayerCount_; i++) {
-    LOGI("deviceLayerName: %s", devLayerProp_[i].layerName);
-    devLayers_.push_back(devLayerProp_[i].layerName);
-  }
-  CheckLayerLoadingSequence(&devLayers_);
-
-  // get all supported ext props
-  ExtInfo ext{0, nullptr};
-  CALL_VK(vkEnumerateDeviceExtensionProperties(physicalDev_, nullptr,
-                                               &ext.count, nullptr));
-  if (ext.count) {
-    ext.prop = new VkExtensionProperties[ext.count];
-    assert(ext.prop);
-    CALL_VK(vkEnumerateDeviceExtensionProperties(physicalDev_, nullptr,
-                                                 &ext.count, ext.prop));
-    devExtProp_.push_back(ext);
-  }
-  for (int i = 0; i < devLayerCount_; i++) {
-    ext.count = 0;
-    CALL_VK(vkEnumerateDeviceExtensionProperties(
-        physicalDev_, devLayerProp_[i].layerName, &ext.count, nullptr));
-    if (ext.count) {
-      ext.prop = new VkExtensionProperties[ext.count];
-      assert(ext.prop);
+    // Pull extensions supported by the layer and append to the extension list
+    uint32_t extCount = 0;
+    CALL_VK(vkEnumerateDeviceExtensionProperties(physicalDev, name, &extCount,
+            nullptr));
+    if (extCount) {
+      VkExtensionProperties* extProp = new VkExtensionProperties[extCount];
       CALL_VK(vkEnumerateDeviceExtensionProperties(
-          physicalDev_, devLayerProp_[i].layerName, &ext.count, ext.prop));
-      devExtProp_.push_back(ext);
+              physicalDev, layerNames[i], &extCount, extProp));
+      addExtNames(extNames, extCount, extProp);
+      delete [] extProp;
     }
   }
+  layersCache_[physicalDev] = layerNames;
+  if(properties) delete [] properties;
 
-  InitExtNames(devExtProp_, &devExts_);
-}
+  // Get all implicitly supported extension properties at this physical device level
+  uint32_t extCount = 0;
+  CALL_VK(vkEnumerateDeviceExtensionProperties(physicalDev, nullptr,
+                                               &extCount, nullptr));
+  if (extCount) {
+    VkExtensionProperties* extProp = new VkExtensionProperties[extCount];
+    CALL_VK(vkEnumerateDeviceExtensionProperties(physicalDev, nullptr,
+                                                 &extCount, extProp));
+    addExtNames(extNames, extCount, extProp);
+    delete [] extProp;
+  }
 
-char** LayerAndExtensions::DevLayerNames(void) {
-  assert(physicalDev_ != VK_NULL_HANDLE);
-  if (devLayers_.size()) return devLayers_.data();
-
-  return nullptr;
-}
-uint32_t LayerAndExtensions::DevLayerCount(void) {
-  assert(physicalDev_ != VK_NULL_HANDLE);
-  return devLayers_.size();
-}
-char** LayerAndExtensions::DevExtNames(void) {
-  assert(physicalDev_ != VK_NULL_HANDLE);
-  if (devExts_.size()) return devExts_.data();
-  return nullptr;
-}
-uint32_t LayerAndExtensions::DevExtCount(void) {
-  assert(physicalDev_ != VK_NULL_HANDLE);
-  return devExts_.size();
+  extCache_[physicalDev] = extNames;
 }
 
-const char* LayerAndExtensions::GetDbgExtName(void) { return kDbgExtName; }
-bool LayerAndExtensions::HookDbgReportExt(VkInstance instance) {
-  instance_ = instance;
-  if (!IsInstExtSupported(GetDbgExtName())) {
+/**
+ * layer and extension dumping
+ */
+void LayerAndExtensions::dumpLayers(void) {
+    if (layersCache_.empty()) return;
+    for(auto& layer: layersCache_) {
+        LOGI("Available Layers for %p: ", layer.first);
+        for( auto& name : layer.second) {
+            LOGI("%s", name);
+        }
+    }
+}
+
+void LayerAndExtensions::dumpExtensions(void) {
+    if (extCache_.empty()) return;
+
+    for(auto& item: extCache_) {
+        LOGI("Extensions for %p:", item.first);
+        for(auto& name : item.second) {
+            LOGI("%s", name);
+        }
+    }
+}
+
+/**
+ * Clean up caches upon exit.
+ */
+LayerAndExtensions::~LayerAndExtensions() {
+    if(!layersCache_.empty()) {
+        for(auto& layer: layersCache_) {
+            for(auto& name : layer.second) {
+                delete [] name;
+            }
+        }
+    }
+
+    if(!extCache_.empty()) {
+        for(auto& item: extCache_) {
+            for(auto& name : item.second) {
+                delete [] name;
+            }
+        }
+    }
+}
+
+/**
+ * Register our vkDebugReportCallbackEX_impl function to Vulkan so we could process callbacks.
+ * @param instance
+ * @return
+ */
+bool LayerAndExtensions::hookDbgReportExt(VkInstance instance) {
+  if (!isExtensionSupported(ExtensionType::DEVICE_EXTENSION, VK_NULL_HANDLE, kDbgExtName)) {
     return false;
   }
   if (!vkCreateDebugReportCallbackEXT) {
@@ -353,9 +384,13 @@ bool LayerAndExtensions::HookDbgReportExt(VkInstance instance) {
                VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
                VK_DEBUG_REPORT_ERROR_BIT_EXT,
       .pfnCallback = vkDebugReportCallbackEX_impl,
-      .pUserData = this,  // we provide the debug object as context
+      .pUserData = nullptr,  // no userdata we this object is not in memory anymore
+                             // when debug callback is happening
   };
-  CALL_VK(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr,
-                                         &vkCallbackHandle_));
+
+  // Intend to keep the callback alive for the full vulkan instance life cycle, not caching
+  // the returned callback handle, not calling vkDestroyDebugReportCallbackEXT either.
+  VkDebugReportCallbackEXT callbackHandle;
+  CALL_VK(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr, &callbackHandle));
   return true;
 }

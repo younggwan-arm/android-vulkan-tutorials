@@ -77,16 +77,16 @@ bool initialize(android_app* app) {
   VkApplicationInfo appInfo = {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
-      .apiVersion = VK_MAKE_VERSION(1, 0, 0),
-      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .pApplicationName = "tutorial02_prebuilt_layers",
+      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "tutorial",
+      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+      .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
-  // prepare debug and layer objects
-  LayerAndExtensions layerAndExt;
-  layerAndExt.AddInstanceExt(layerAndExt.GetDbgExtName());
+  // prepare debug and layer objects(enabling all available layers & extensions for this example)
+  LayerAndExtensions layerUtil;
+  assert(layerUtil.isLayerSupported("VK_LAYER_KHRONOS_validation"));
 
   // Create Vulkan instance, requesting all enabled layers / extensions
   // available on the system
@@ -94,17 +94,17 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledExtensionCount = layerAndExt.InstExtCount(),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerAndExt.InstExtNames()),
-      .enabledLayerCount = layerAndExt.InstLayerCount(),
+      .enabledLayerCount = layerUtil.getLayerCount(),
       .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerAndExt.InstLayerNames()),
+          static_cast<const char* const*>(layerUtil.getLayerNames()),
+      .enabledExtensionCount = layerUtil.getExtensionCount(ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
+      .ppEnabledExtensionNames =
+          static_cast<const char* const*>(layerUtil.getExtensionNames(ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE)),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
   // Create debug callback obj and connect to vulkan instance
-  layerAndExt.HookDbgReportExt(tutorialInstance);
+  layerUtil.hookDbgReportExt(tutorialInstance);
 
   // Find one GPU to use:
   // On Android, every GPU device is equal -- supporting
@@ -115,9 +115,6 @@ bool initialize(android_app* app) {
   VkPhysicalDevice tmpGpus[gpuCount];
   CALL_VK(vkEnumeratePhysicalDevices(tutorialInstance, &gpuCount, tmpGpus));
   tutorialGpu = tmpGpus[0];  // Pick up the first GPU Device
-
-  // Enumerate available device validation layers & extensions
-  layerAndExt.InitDevLayersAndExt(tutorialGpu);
 
   // check for vulkan info on this GPU device
   VkPhysicalDeviceProperties gpuProperties;
@@ -183,11 +180,11 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .queueCount = 1,
       .queueFamilyIndex = queueFamilyIndex,
-      // Send nullptr for queue priority so debug extension could
-      // catch the bug and call back app's debug function
-      .pQueuePriorities = nullptr,  // priorities,
+      .queueCount = 1,
+      // Send nullptr for queue priority, instead of the priority array
+      // so debug extension could catch the bug and call back app's debug function
+      .pQueuePriorities = nullptr, // priorities,
   };
 
   VkDeviceCreateInfo deviceCreateInfo{
@@ -195,12 +192,9 @@ bool initialize(android_app* app) {
       .pNext = nullptr,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &queueCreateInfo,
-      .enabledLayerCount = layerAndExt.DevLayerCount(),
-      .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerAndExt.DevLayerNames()),
-      .enabledExtensionCount = layerAndExt.DevExtCount(),
+      .enabledExtensionCount = layerUtil.getExtensionCount(ExtensionType::DEVICE_EXTENSION, tutorialGpu),
       .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerAndExt.DevExtNames()),
+          static_cast<const char* const*>(layerUtil.getExtensionNames(ExtensionType::DEVICE_EXTENSION, tutorialGpu)),
       .pEnabledFeatures = nullptr,
   };
 
