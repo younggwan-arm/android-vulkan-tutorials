@@ -43,18 +43,33 @@ class LayerAndExtensions {
   ~LayerAndExtensions();
 
   uint32_t getLayerCount(void);
-  char** getLayerNames(void);
+  const char* const* getLayerNames(void);
   bool isLayerSupported(const char* name);
 
   uint32_t getExtensionCount(ExtensionType type, void* handle);
-  char** getExtensionNames(ExtensionType type, void* handle);
-  bool isExtensionSupported(ExtensionType type, void* handle, const char* extName);
+  /**
+   * getExtensionNames(): return the extension names.
+   *     The memory holding the names is valid
+   *     as long as the object is not deleted.
+   * @param handle a valid VkPhysicalDevice, or VK_NULL_HANDLE if this is for layer extensions
+   * @return an array of strings for extension names.
+   */
+  const char* const* getExtensionNames(ExtensionType type, void* handle);
+  bool isExtensionSupported(const char* extName, ExtensionType type, void* handle);
 
   bool hookDbgReportExt(VkInstance instance);
 
 
-  void dumpLayers(void);        // print layer names to logcat
-  void dumpExtensions(void);    // print extension to logcat
+  void printLayers(void);        // print layer names to logcat
+  void printExtensions(void);    // print extension to logcat
+  /**
+   * printExtensions()  dump the extensions regarding to layers or implicitly implemented in this
+   *     Vulkan implementation.
+   * @param layerName the name of layer, or nullptr for this Vulkan implementation
+   * @param device VkPhysicalDevice handle if device extensions are of interest too;
+   *        or VK_NULL_HANDLE for instance extensions only.
+   */
+  void printExtensions(const char* layerName, VkPhysicalDevice device); // print extensions in the given layer
 
  private:
   VkInstance instance_;

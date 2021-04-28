@@ -84,9 +84,16 @@ bool initialize(android_app* app) {
       .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
-  // prepare debug and layer objects(enabling all available layers & extensions for this example)
+  // Enable validation and debug layer/extensions, together with other necessary extensions
   LayerAndExtensions layerUtil;
-  assert(layerUtil.isLayerSupported("VK_LAYER_KHRONOS_validation"));
+  const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
+  const char* extensions[] = {"VK_EXT_debug_report", "VK_KHR_surface", "VK_KHR_android_surface"};
+  for (auto layerName: layers) {
+      assert(layerUtil.isLayerSupported(layerName));
+  }
+  for(auto extName:extensions) {
+    assert(layerUtil.isExtensionSupported(extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
+  }
 
   // Create Vulkan instance, requesting all enabled layers / extensions
   // available on the system
@@ -94,16 +101,14 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledLayerCount = layerUtil.getLayerCount(),
-      .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerUtil.getLayerNames()),
-      .enabledExtensionCount = layerUtil.getExtensionCount(ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerUtil.getExtensionNames(ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE)),
+      .enabledLayerCount = sizeof(layers)/sizeof(layers[0]),
+      .ppEnabledLayerNames = layers,
+      .enabledExtensionCount = sizeof(extensions)/sizeof(extensions[0]),
+      .ppEnabledExtensionNames = extensions,
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
-  // Create debug callback obj and connect to vulkan instance
+  // Create debug callback obj and connect to Vulkan instance
   layerUtil.hookDbgReportExt(tutorialInstance);
 
   // Find one GPU to use:
@@ -192,9 +197,8 @@ bool initialize(android_app* app) {
       .pNext = nullptr,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &queueCreateInfo,
-      .enabledExtensionCount = layerUtil.getExtensionCount(ExtensionType::DEVICE_EXTENSION, tutorialGpu),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerUtil.getExtensionNames(ExtensionType::DEVICE_EXTENSION, tutorialGpu)),
+      .enabledExtensionCount = 0,
+      .ppEnabledExtensionNames = nullptr,
       .pEnabledFeatures = nullptr,
   };
 

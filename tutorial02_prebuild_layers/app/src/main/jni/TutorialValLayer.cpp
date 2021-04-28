@@ -39,9 +39,10 @@ static const char* kTAG = "Vulkan-Tutorial02";
 static const char * kValLayerName = "VK_LAYER_KHRONOS_validation";
 
 /**
- * Debug Extension names in use.
+ * Debug Extension names.
  */
-static const char* kDbgExtName = "VK_EXT_debug_report";
+static const char* kDbgReportExtName = "VK_EXT_debug_report";
+static const char* kDbgReportUtilsName = "VK_EXT_debug_utils";
 
 // Simple Dbg Callback function to be used by Vk engine
 static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
@@ -99,7 +100,6 @@ static bool addExtNames(std::vector<char*>& extStore, uint32_t count,
     return true;
 }
 
-
 /**
  * Constructor: initialize layer cache
  */
@@ -130,7 +130,6 @@ LayerAndExtensions::LayerAndExtensions(void) {
   for (uint32_t i = 0; i < layerCount; i++) {
     char* name = cloneString(layerProp[i].layerName);
     layers.push_back(name);
-    LOGI("instanceLayer name: %s", name);
 
     CALL_VK(vkEnumerateInstanceExtensionProperties(name, &count, nullptr));
     if (count == 0) continue;
@@ -150,7 +149,7 @@ LayerAndExtensions::LayerAndExtensions(void) {
  * Report available layer names
  * @return: an array of layer name pointers, NULL if no layers are available
  */
-char** LayerAndExtensions::getLayerNames(void) {
+const char* const* LayerAndExtensions::getLayerNames(void) {
   auto layers = layersCache_.find(VK_NULL_HANDLE);
   if(layers == layersCache_.end() || layers->second.empty()) {
     return nullptr;
@@ -175,7 +174,7 @@ uint32_t LayerAndExtensions::getLayerCount(void) {
   return count;
 }
 
-char** LayerAndExtensions::getExtensionNames(ExtensionType type, void* handle) {
+const char* const* LayerAndExtensions::getExtensionNames(ExtensionType type, void* handle) {
   if (type == ExtensionType::LAYER_EXTENSION) {
     assert(handle == VK_NULL_HANDLE);
   } else {
@@ -210,7 +209,7 @@ uint32_t LayerAndExtensions::getExtensionCount(ExtensionType type, void* handle)
   return static_cast<uint32_t>(it->second.size());
 }
 
-bool LayerAndExtensions::isExtensionSupported(ExtensionType type, void* handle, const char* extName) {
+bool LayerAndExtensions::isExtensionSupported(const char* extName, ExtensionType type, void* handle) {
   if (type == ExtensionType::LAYER_EXTENSION) {
     assert(handle == VK_NULL_HANDLE);
   } else {
@@ -312,9 +311,9 @@ void LayerAndExtensions::initDevExtensions(void* device) {
 }
 
 /**
- * layer and extension dumping
+ * layer and extension printing
  */
-void LayerAndExtensions::dumpLayers(void) {
+void LayerAndExtensions::printLayers(void) {
     if (layersCache_.empty()) return;
     for(auto& layer: layersCache_) {
         LOGI("Available Layers for %p: ", layer.first);
@@ -324,7 +323,7 @@ void LayerAndExtensions::dumpLayers(void) {
     }
 }
 
-void LayerAndExtensions::dumpExtensions(void) {
+void LayerAndExtensions::printExtensions(void) {
     if (extCache_.empty()) return;
 
     for(auto& item: extCache_) {
@@ -333,6 +332,37 @@ void LayerAndExtensions::dumpExtensions(void) {
             LOGI("%s", name);
         }
     }
+}
+
+void LayerAndExtensions::printExtensions(const char* name, VkPhysicalDevice device) {
+  uint32_t count = 0;
+
+  const char* layerName = name ? name : "Vulkan Implementation";
+  CALL_VK(vkEnumerateInstanceExtensionProperties(name, &count, nullptr));
+  if (count == 0) return;
+
+  VkExtensionProperties* prop = new VkExtensionProperties[count];
+  CALL_VK(vkEnumerateInstanceExtensionProperties(name, &count, prop));
+
+  if(count==0) return;
+  LOGI("Instance Extensions in layer: %s", layerName);
+  for(uint32_t i = 0; i < count; i++) {
+    LOGI("Name: %s, Ver: %#x", prop[i].extensionName, prop[i].specVersion);
+  }
+  delete [] prop;
+
+  if(device == VK_NULL_HANDLE) return;
+  CALL_VK(vkEnumerateDeviceExtensionProperties(device, name, &count, nullptr));
+  if (count == 0) return;
+
+  prop = new VkExtensionProperties[count];
+  CALL_VK(vkEnumerateDeviceExtensionProperties(
+            device, name, &count, prop));
+  LOGI("Device Extensions in layer: %s", layerName);
+  for(uint32_t i = 0; i < count; i++) {
+    LOGI("Name: %s, Ver: %#x", prop[i].extensionName, prop[i].specVersion);
+  }
+  delete [] prop;
 }
 
 /**
@@ -362,7 +392,7 @@ LayerAndExtensions::~LayerAndExtensions() {
  * @return
  */
 bool LayerAndExtensions::hookDbgReportExt(VkInstance instance) {
-  if (!isExtensionSupported(ExtensionType::DEVICE_EXTENSION, VK_NULL_HANDLE, kDbgExtName)) {
+  if (!isExtensionSupported(kDbgReportExtName, ExtensionType::DEVICE_EXTENSION, VK_NULL_HANDLE)) {
     return false;
   }
   if (!vkCreateDebugReportCallbackEXT) {
@@ -388,7 +418,7 @@ bool LayerAndExtensions::hookDbgReportExt(VkInstance instance) {
                              // when debug callback is happening
   };
 
-  // Intend to keep the callback alive for the full vulkan instance life cycle, not caching
+  // Intend to keep the callback alive for the full Vulkan instance life cycle, not caching
   // the returned callback handle, not calling vkDestroyDebugReportCallbackEXT either.
   VkDebugReportCallbackEXT callbackHandle;
   CALL_VK(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr, &callbackHandle));
