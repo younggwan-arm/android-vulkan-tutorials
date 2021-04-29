@@ -77,11 +77,11 @@ bool initialize(android_app* app) {
   VkApplicationInfo appInfo = {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
-      .apiVersion = VK_MAKE_VERSION(1, 0, 0),
-      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .pApplicationName = "tutorial03_traceable_layers",
+      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "tutorial",
+      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+      .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
   // prepare debug and layer objects
@@ -94,12 +94,12 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledExtensionCount = layerAndExt.InstExtCount(),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerAndExt.InstExtNames()),
       .enabledLayerCount = layerAndExt.InstLayerCount(),
       .ppEnabledLayerNames =
           static_cast<const char* const*>(layerAndExt.InstLayerNames()),
+      .enabledExtensionCount = layerAndExt.InstExtCount(),
+      .ppEnabledExtensionNames =
+          static_cast<const char* const*>(layerAndExt.InstExtNames()),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
@@ -183,8 +183,8 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .queueCount = 1,
       .queueFamilyIndex = queueFamilyIndex,
+      .queueCount = 1,
       // Send nullptr for queue priority so debug extension could
       // catch the bug and call back app's debug function
       .pQueuePriorities = nullptr,  // priorities,

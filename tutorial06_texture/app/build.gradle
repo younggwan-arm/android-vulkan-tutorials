@@ -1,12 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion  25
-
+    compileSdkVersion  30
+    ndkVersion '22.0.7026061'
     defaultConfig {
         applicationId "com.vulkan.tutorials.six"
-        minSdkVersion 24
-        targetSdkVersion 24
+        minSdkVersion 26
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0.0"
 
@@ -14,7 +14,7 @@ android {
         externalNativeBuild {
             cmake.arguments '-DANDROID_TOOLCHAIN=clang',
                             '-DANDROID_STL=c++_static',
-                            '-DANDROID_PLATFORM=android-24'
+                            '-DANDROID_PLATFORM=android-26'
         }
     }
     externalNativeBuild {
@@ -25,19 +25,5 @@ android {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.pro'))
         }
-    }
-}
-
-// ******** Generate cdep module file for shaderc *******
-// this is same as running on command line of: ./cdep [cdep.bat]
-def CDEP_CMD='./cdep'
-if (System.properties['os.name'].toLowerCase().contains('windows')) {
-    CDEP_CMD='cdep.bat'
-}
-if(!file("../.cdep").exists()) {
-    exec {
-        workingDir("..")
-        executable "${CDEP_CMD}"
-        args = []
     }
 }

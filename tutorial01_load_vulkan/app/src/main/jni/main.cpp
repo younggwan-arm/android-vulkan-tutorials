@@ -76,11 +76,11 @@ bool initialize(android_app* app) {
   VkApplicationInfo appInfo = {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
-      .apiVersion = VK_MAKE_VERSION(1, 0, 0),
-      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .pApplicationName = "tutorial01_load_vulkan",
+      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "tutorial",
+      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+      .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
   // prepare necessary extensions: Vulkan on Android need these to function
@@ -94,10 +94,10 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledExtensionCount = static_cast<uint32_t>(instanceExt.size()),
-      .ppEnabledExtensionNames = instanceExt.data(),
       .enabledLayerCount = 0,
       .ppEnabledLayerNames = nullptr,
+      .enabledExtensionCount = static_cast<uint32_t>(instanceExt.size()),
+      .ppEnabledExtensionNames = instanceExt.data(),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
@@ -176,8 +176,8 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .queueCount = 1,
       .queueFamilyIndex = queueFamilyIndex,
+      .queueCount = 1,
       .pQueuePriorities = priorities,
   };
 

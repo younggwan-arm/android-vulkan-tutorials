@@ -5,7 +5,6 @@ project(tutorial06_texture)
 # build native_app_glue as a static lib
 add_library(native_glue STATIC
     ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
-
 # build Vulkan app
 set(SRC_DIR ${CMAKE_SOURCE_DIR})
 get_filename_component(REPO_ROOT_DIR
@@ -23,10 +22,11 @@ target_include_directories(vktuts PRIVATE
    ${COMMON_DIR}/vulkan_wrapper
    ${COMMON_DIR}/src
    ${THIRD_PARTY_DIR}
-   ${ANDROID_NDK}/sources/android/native_app_glue)
+   ${ANDROID_NDK}/sources/android/native_app_glue
+   ${CMAKE_CURRENT_SOURCE_DIR}/shaderc/include)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-       -std=c++11 -Werror -Wno-unused-variable \
+       -std=c++11 -Wall -Wno-unused-variable \
        -Wno-delete-non-virtual-dtor -DVK_USE_PLATFORM_ANDROID_KHR")
 
 if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
@@ -36,20 +36,12 @@ if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
        -Wl,--no-warn-mismatch")
 endif()
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
-target_link_libraries(vktuts native_glue log android)
 
-########     CDep package for shaderc    ######################
-# pre-requirement:
-#    in terminal, cd {project_dir}; ./cdep
-# that will generate .cdep/modules/cdep-dependencies-config.cmake
-# the next 2 lines will be able to pull it into the project
-# shaderc binaries are saved on github:
-#      https://github.com/ggfan/shaderc/releases
-# CDep fetches the lib with config file in ${project_dir}/cdep.yml
-# ******* Most Importantly, CDep full documentation is @:
-#  https://github.com/google/cdep
-get_filename_component(cdep-dependencies_DIR
-   ${CMAKE_SOURCE_DIR}/../../../../.cdep/modules  ABSOLUTE)
-find_package(cdep-dependencies REQUIRED)
-add_all_cdep_dependencies(vktuts)
+# requirement: prebuild shaderc with:
+#  cd  ${CMAKE_CURRENT_SOURCE_DIR} && mkdir -p shaderc
+#  ${ANDROID_NDK}/ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=${ANDROID_NDK}/sources/third_party/shaderc/Android.mk APP_STL:=all APP_ABI:=all APP_PLATFORM:=android-26 libshaderc_combined
+add_library(shaderc STATIC IMPORTED)
+set_target_properties(shaderc PROPERTIES IMPORTED_LOCATION
+        ${CMAKE_CURRENT_SOURCE_DIR}/shaderc/libs/${ANDROID_STL}/${ANDROID_ABI}/libshaderc.a)
 
+target_link_libraries(vktuts native_glue log android shaderc)
