@@ -70,9 +70,9 @@ VkResult buildShaderFromFile(android_app* appInfo, const char* filePath,
   VkShaderModuleCreateInfo shaderModuleCreateInfo{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext = nullptr,
+      .flags = 0,
       .codeSize = shaderc_result_get_length(spvShader),
       .pCode = (const uint32_t*)shaderc_result_get_bytes(spvShader),
-      .flags = 0,
   };
   VkResult result = vkCreateShaderModule(vkDevice, &shaderModuleCreateInfo,
                                          nullptr, shaderOut);
