@@ -14,8 +14,10 @@
 
 #include <android/log.h>
 #include <android_native_app_glue.h>
+
 #include <cassert>
 #include <vector>
+
 #include "TutorialValLayer.hpp"
 #include "vulkan_wrapper.h"
 
@@ -84,27 +86,37 @@ bool initialize(android_app* app) {
       .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
-  // prepare debug and layer objects
-  LayerAndExtensions layerAndExt;
-  layerAndExt.AddInstanceExt(layerAndExt.GetDbgExtName());
-
-  // Create Vulkan instance, requesting all enabled layers / extensions
-  // available on the system
+  // Enable validation and debug layer/extensions, together with other necessary
+  // extensions
+  LayerAndExtensions layerUtil;
+  const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
+  const char* extensions[] = {"VK_EXT_debug_report", "VK_KHR_surface",
+                              "VK_KHR_android_surface"};
+  for (auto layerName : layers) {
+    assert(layerUtil.isLayerSupported(layerName));
+  }
+  for (auto extName : extensions) {
+    assert(layerUtil.isExtensionSupported(
+        extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
+  }
+  // Create Vulkan instance, requesting all available layers & extensions on the
+  // system
   VkInstanceCreateInfo instanceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledLayerCount = layerAndExt.InstLayerCount(),
+      .enabledLayerCount = layerUtil.getLayerCount(),
       .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerAndExt.InstLayerNames()),
-      .enabledExtensionCount = layerAndExt.InstExtCount(),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerAndExt.InstExtNames()),
+          static_cast<const char* const*>(layerUtil.getLayerNames()),
+      .enabledExtensionCount = layerUtil.getExtensionCount(
+          ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
+      .ppEnabledExtensionNames = layerUtil.getExtensionNames(
+          ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
   // Create debug callback obj and connect to vulkan instance
-  layerAndExt.HookDbgReportExt(tutorialInstance);
+  layerUtil.hookDbgReportExt(tutorialInstance);
 
   // Find one GPU to use:
   // On Android, every GPU device is equal -- supporting
@@ -115,9 +127,6 @@ bool initialize(android_app* app) {
   VkPhysicalDevice tmpGpus[gpuCount];
   CALL_VK(vkEnumeratePhysicalDevices(tutorialInstance, &gpuCount, tmpGpus));
   tutorialGpu = tmpGpus[0];  // Pick up the first GPU Device
-
-  // Enumerate available device validation layers & extensions
-  layerAndExt.InitDevLayersAndExt(tutorialGpu);
 
   // check for vulkan info on this GPU device
   VkPhysicalDeviceProperties gpuProperties;
@@ -160,16 +169,18 @@ bool initialize(android_app* app) {
 
   // Find a GFX queue family
   uint32_t queueFamilyCount;
-  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount,
+                                           nullptr);
   assert(queueFamilyCount);
-  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount,
                                            queueFamilyProperties.data());
 
   uint32_t queueFamilyIndex;
-  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+  for (queueFamilyIndex = 0; queueFamilyIndex < queueFamilyCount;
        queueFamilyIndex++) {
-    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags &
+        VK_QUEUE_GRAPHICS_BIT) {
       break;
     }
   }
@@ -195,12 +206,15 @@ bool initialize(android_app* app) {
       .pNext = nullptr,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &queueCreateInfo,
-      .enabledLayerCount = layerAndExt.DevLayerCount(),
-      .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerAndExt.DevLayerNames()),
-      .enabledExtensionCount = layerAndExt.DevExtCount(),
-      .ppEnabledExtensionNames =
-          static_cast<const char* const*>(layerAndExt.DevExtNames()),
+      // Per Vulkan Spec, layers are the same for the instance and physical
+      // device we load them again(we do not have to) is for recommended
+      // backward compatibility purpose.
+      .enabledLayerCount = layerUtil.getLayerCount(),
+      .ppEnabledLayerNames = layerUtil.getLayerNames(),
+      .enabledExtensionCount = layerUtil.getExtensionCount(
+          ExtensionType::DEVICE_EXTENSION, tutorialGpu),
+      .ppEnabledExtensionNames = layerUtil.getExtensionNames(
+          ExtensionType::DEVICE_EXTENSION, tutorialGpu),
       .pEnabledFeatures = nullptr,
   };
 

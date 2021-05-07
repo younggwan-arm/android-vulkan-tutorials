@@ -14,80 +14,73 @@
 #ifndef __VALLAYER_HPP__
 #define __VALLAYER_HPP__
 #include <vulkan_wrapper.h>
+
 #include <iostream>
 #include <map>
 #include <vector>
 
-// Some loader only report one layer for device layers, enable this to
-// workaround it: it will copy all instance layers into device layers
-// and NOT enumerating device layers
-//#define LOADER_DEVICE_LAYER_REPORT_BUG_WA
+/**
+ * an enum to indicate request for vkInstance or vkPhysicalDevice
+ */
+enum class ExtensionType {
+  LAYER_EXTENSION,
+  DEVICE_EXTENSION,
+};
 
-// If extension is not enumerated, it should not be enabled in general;
-// If you know an extension is on the device, but loader does not report it,
-// it could be forced in by enabling
-// the following compile flag and call AddInstanceExt().
-// #define ENABLE_NON_ENUMERATED_EXT 1
-
-// A Helper class to manage validation layers and extensions
-// Supposed usage:
-//   1) validation layers: app should enable them with
-//        InstanceLayerCount()
-//        InstanceLayerNames()
-//   2) Extension layers:  app should check for supportability
-//        and then enable in app code ( not in this class )
-//   3) DbgExtension: once instance is created, just call
-//        HookDbgReportExt
+/** A Helper class to manage validation layers and extensions
+ * Supposed usage:
+ *   1) At instance creation time, validation layer could be enabled by enable
+ * all discovered layers getLayerCount() getLayerNames() 2) DbgExtension: once
+ * instance is created, call hookDbgReportExt 2) at device creation time, enable
+ * all extensions available by: getExtensionCount() getExtensionNames()
+ */
 class LayerAndExtensions {
  public:
   LayerAndExtensions(void);
   ~LayerAndExtensions();
 
-  uint32_t InstLayerCount(void);
-  char** InstLayerNames(void);
-  uint32_t InstExtCount(void);
-  char** InstExtNames(void);
-  bool IsInstExtSupported(const char* extName);
-  bool IsInstLayerSupported(const char* layerName);
+  uint32_t getLayerCount(void);
+  const char* const* getLayerNames(void);
+  bool isLayerSupported(const char* name);
 
-  const char* GetDbgExtName(void);
-  bool AddInstanceExt(const char* extName);
-  bool HookDbgReportExt(VkInstance instance);
+  uint32_t getExtensionCount(ExtensionType type, void* handle);
+  /**
+   * getExtensionNames(): return the extension names.
+   *     The memory holding the names is valid
+   *     as long as the object is not deleted.
+   * @param handle a valid VkPhysicalDevice, or VK_NULL_HANDLE if this is for
+   * layer extensions
+   * @return an array of strings for extension names.
+   */
+  const char* const* getExtensionNames(ExtensionType type, void* handle);
+  bool isExtensionSupported(const char* extName, ExtensionType type,
+                            void* handle);
 
-  void InitDevLayersAndExt(VkPhysicalDevice physicalDevice);
-  char** DevLayerNames(void);
-  uint32_t DevLayerCount(void);
-  char** DevExtNames(void);
-  uint32_t DevExtCount(void);
+  bool hookDbgReportExt(VkInstance instance);
+
+  void printLayers(void);      // print layer names to logcat
+  void printExtensions(void);  // print extension to logcat
+  /**
+   * printExtensions()  dump the extensions regarding to layers or implicitly
+   * implemented in this Vulkan implementation.
+   * @param layerName the name of layer, or nullptr for this Vulkan
+   * implementation
+   * @param device VkPhysicalDevice handle if device extensions are of interest
+   * too; or VK_NULL_HANDLE for instance extensions only.
+   */
+  void printExtensions(
+      const char* layerName,
+      VkPhysicalDevice device);  // print extensions in the given layer
 
  private:
-  // internal helper data structure
-  struct ExtInfo {
-    uint32_t count;
-    VkExtensionProperties* prop;
-  };
-
   VkInstance instance_;
   VkDebugReportCallbackEXT vkCallbackHandle_;
-  VkPhysicalDevice physicalDev_;
 
-  std::vector<char*> instLayers_;
-  std::vector<char*> instExts_;
-  std::vector<char*> devLayers_;
-  std::vector<char*> devExts_;
+  std::map<void*, std::vector<char*>> layersCache_;
+  std::map<void*, std::vector<char*>> extCache_;
 
-  VkLayerProperties* instLayerProp_{nullptr};
-  uint32_t instLayerCount_{0};
-  std::vector<ExtInfo> instExtProp_;
-
-  VkLayerProperties* devLayerProp_{nullptr};
-  uint32_t devLayerCount_{0};
-  std::vector<ExtInfo> devExtProp_;
-
-  bool InitInstExts(void);
-  bool InitExtNames(const std::vector<ExtInfo>& props,
-                    std::vector<char*>* names);
-  void CheckLayerLoadingSequence(std::vector<char*>* layers);
+  // helper functions
+  void initDevExtensions(void*);
 };
 
 #endif  // __VALLAYER_HPP__
