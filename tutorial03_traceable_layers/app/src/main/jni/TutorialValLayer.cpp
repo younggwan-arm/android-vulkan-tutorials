@@ -41,44 +41,6 @@ static const char* kTAG = "Vulkan-Tutorial02";
 static const char* kValLayerName = "VK_LAYER_KHRONOS_validation";
 
 /**
- * Debug Extension names.
- */
-static const char* kDbgReportExtName = "VK_EXT_debug_report";
-static const char* kDbgReportUtilsName = "VK_EXT_debug_utils";
-
-// Simple Dbg Callback function to be used by Vk engine
-static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
-    VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
-    uint64_t object, size_t location, int32_t messageCode,
-    const char* pLayerPrefix, const char* pMessage, void* pUserData) {
-  // pUserData is not usable as we did not set it up when we were registering
-  // the callback
-  if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_INFO, "Vulkan-Debug-Message: ", "%s -- %s",
-                        pLayerPrefix, pMessage);
-  }
-  if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_WARN, "Vulkan-Debug-Message: ", "%s -- %s",
-                        pLayerPrefix, pMessage);
-  }
-  if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_WARN,
-                        "Vulkan-Debug-Message-(Perf): ", "%s -- %s",
-                        pLayerPrefix, pMessage);
-  }
-  if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_ERROR, "Vulkan-Debug-Message: ", "%s -- %s",
-                        pLayerPrefix, pMessage);
-  }
-  if (flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
-    __android_log_print(ANDROID_LOG_DEBUG, "Vulkan-Debug-Message: ", "%s -- %s",
-                        pLayerPrefix, pMessage);
-  }
-
-  return VK_FALSE;
-}
-
-/**
  * Helper function cloneString(): allocation and copy a string,
  * src is never null.
  */
@@ -395,44 +357,190 @@ LayerAndExtensions::~LayerAndExtensions() {
 }
 
 /**
+ * Debug Extension names.
+ */
+static const char* kDbgReportExtName = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+static const char* kDbgUtilsName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+
+/*
+ * Callback function for VK_EXT_DEBUG_REPORT_EXTENSION_NAME
+ * This most likely are not used as the latest validation layer implemented the new
+ *    VK_EXT_DEBUG_UTILS_EXTENSION_NAME.
+ */
+static VkBool32 VKAPI_PTR vkDebugReportCallbackEX_impl(
+        VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType,
+        uint64_t object, size_t location, int32_t messageCode,
+        const char* pLayerPrefix, const char* pMessage, void* pUserData) {
+  // pUserData is not usable as we did not set it up when we were registering
+  // the callback
+  if (flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
+    __android_log_print(ANDROID_LOG_INFO, "Vulkan-Debug-Message: ", "%s -- %s",
+                        pLayerPrefix, pMessage);
+  }
+  if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
+    __android_log_print(ANDROID_LOG_WARN, "Vulkan-Debug-Message: ", "%s -- %s",
+                        pLayerPrefix, pMessage);
+  }
+  if (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
+    __android_log_print(ANDROID_LOG_WARN,
+                        "Vulkan-Debug-Message-(Perf): ", "%s -- %s",
+                        pLayerPrefix, pMessage);
+  }
+  if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
+    __android_log_print(ANDROID_LOG_ERROR, "Vulkan-Debug-Message: ", "%s -- %s",
+                        pLayerPrefix, pMessage);
+  }
+  if (flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
+    __android_log_print(ANDROID_LOG_DEBUG, "Vulkan-Debug-Message: ", "%s -- %s",
+                        pLayerPrefix, pMessage);
+  }
+
+  return VK_FALSE;
+}
+
+/*
+ * Callback function for VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+ */
+VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugUtilsMessengerEXT_impl(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+        const VkDebugUtilsMessengerCallbackDataEXT* callbackData, void* userData) {
+  const char validation[] = "Validation";
+  const char performance[] = "Performance";
+  const char error[] = "ERROR";
+  const char warning[] = "WARNING";
+  const char unknownType[] = "UNKNOWN_TYPE";
+  const char unknownSeverity[] = "UNKNOWN_SEVERITY";
+  const char* typeString = unknownType;
+  const char* severityString = unknownSeverity;
+  const char* messageIdName = callbackData->pMessageIdName;
+  int32_t messageIdNumber = callbackData->messageIdNumber;
+  const char* message = callbackData->pMessage;
+  android_LogPriority priority = ANDROID_LOG_UNKNOWN;
+
+  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    severityString = error;
+    priority = ANDROID_LOG_ERROR;
+  } else if (messageSeverity &
+             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+    severityString = warning;
+    priority = ANDROID_LOG_WARN;
+  }
+  if (messageTypes & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
+    typeString = validation;
+  } else if (messageTypes & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+    typeString = performance;
+  }
+
+  __android_log_print(priority, "AppName", "%s %s: [%s] Code %i : %s",
+                      typeString, severityString, messageIdName,
+                      messageIdNumber, message);
+
+  // Returning false tells the layer not to stop when the event occurs, so
+  // they see the same behavior with and without validation layers enabled.
+  return VK_FALSE;
+}
+
+/**
+ * Report enabled Debug report extension name, could be useful for instance creation.
+ * @return debug report extension name.
+ */
+const char*  LayerAndExtensions::getDbgReportExtName(void) {
+    if (isExtensionSupported(kDbgUtilsName, ExtensionType::LAYER_EXTENSION,
+                             VK_NULL_HANDLE)) {
+        return kDbgUtilsName;
+    }
+
+    if(isExtensionSupported(kDbgReportExtName, ExtensionType::LAYER_EXTENSION,
+                            VK_NULL_HANDLE)) {
+        return kDbgReportExtName;
+    }
+
+    return nullptr;
+}
+/**
  * Register our vkDebugReportCallbackEX_impl function to Vulkan so we could
  * process callbacks.
+ *   - use VK_EXT_debug_utils if available, done.
+ *   - use kDbgReportExtName  if available, done.
+ *   - return false if none of the above 2 debug utils is available.
  * @param instance
- * @return
+ * @return true after the our debugging print handler is registered, false
+ * otherwise.
+ * (Code source: https://developer.android.com/ndk/guides/graphics/validation-layer?release=r21#debug)
  */
 bool LayerAndExtensions::hookDbgReportExt(VkInstance instance) {
-  if (!isExtensionSupported(kDbgReportExtName, ExtensionType::DEVICE_EXTENSION,
+  if (isExtensionSupported(kDbgUtilsName, ExtensionType::LAYER_EXTENSION,
+                           VK_NULL_HANDLE)) {
+    PFN_vkCreateDebugUtilsMessengerEXT pfnCreateDebugUtilsMessengerEXT;
+    PFN_vkDestroyDebugUtilsMessengerEXT pfnDestroyDebugUtilsMessengerEXT;
+    pfnCreateDebugUtilsMessengerEXT =
+        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkCreateDebugUtilsMessengerEXT");
+    pfnDestroyDebugUtilsMessengerEXT =
+        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkDestroyDebugUtilsMessengerEXT");
+
+    // Create the debug messenger callback with desired settings
+    if (pfnCreateDebugUtilsMessengerEXT) {
+      VkDebugUtilsMessengerCreateInfoEXT messengerInfo;
+      constexpr VkDebugUtilsMessageSeverityFlagsEXT kSeveritiesToLog =
+          VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+
+      constexpr VkDebugUtilsMessageTypeFlagsEXT kMessagesToLog =
+          VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+      messengerInfo.sType =
+          VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+      messengerInfo.pNext = nullptr;
+      messengerInfo.flags = 0;
+      messengerInfo.messageSeverity = kSeveritiesToLog;
+      messengerInfo.messageType = kMessagesToLog;
+      messengerInfo.pfnUserCallback =
+          vkDebugUtilsMessengerEXT_impl;  // Callback example below
+      messengerInfo.pUserData = nullptr;  // Custom user data passed to callback
+
+      VkDebugUtilsMessengerEXT debugUtilsMessenger;
+      CALL_VK(pfnCreateDebugUtilsMessengerEXT(instance, &messengerInfo, nullptr,
+                                              &debugUtilsMessenger));
+    }
+    return true;
+  }
+  if (isExtensionSupported(kDbgReportExtName, ExtensionType::LAYER_EXTENSION,
                             VK_NULL_HANDLE)) {
-    return false;
-  }
-  if (!vkCreateDebugReportCallbackEXT) {
-    vkCreateDebugReportCallbackEXT =
-        (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(
-            instance, "vkCreateDebugReportCallbackEXT");
-    vkDestroyDebugReportCallbackEXT =
-        (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
-            instance, "vkDestroyDebugReportCallbackEXT");
-    vkDebugReportMessageEXT =
-        (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(
-            instance, "vkDebugReportMessageEXT");
-  }
+    if (!vkCreateDebugReportCallbackEXT) {
+      vkCreateDebugReportCallbackEXT =
+              (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(
+                      instance, "vkCreateDebugReportCallbackEXT");
+      vkDestroyDebugReportCallbackEXT =
+              (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(
+                      instance, "vkDestroyDebugReportCallbackEXT");
+      vkDebugReportMessageEXT =
+              (PFN_vkDebugReportMessageEXT) vkGetInstanceProcAddr(
+                      instance, "vkDebugReportMessageEXT");
+    }
 
-  VkDebugReportCallbackCreateInfoEXT dbgInfo = {
-      .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
-      .pNext = nullptr,
-      .flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
-               VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-               VK_DEBUG_REPORT_ERROR_BIT_EXT,
-      .pfnCallback = vkDebugReportCallbackEX_impl,
-      .pUserData = nullptr,  // no userdata we this object is not in memory
-                             // anymore when debug callback is happening
-  };
+    VkDebugReportCallbackCreateInfoEXT dbgInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+            .pNext = nullptr,
+            .flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
+                     VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+                     VK_DEBUG_REPORT_ERROR_BIT_EXT,
+            .pfnCallback = vkDebugReportCallbackEX_impl,
+            .pUserData = nullptr,  // no userdata we this object is not in memory
+            // anymore when debug callback is happening
+    };
 
-  // Intend to keep the callback alive for the full Vulkan instance life cycle,
-  // not caching the returned callback handle, not calling
-  // vkDestroyDebugReportCallbackEXT either.
-  VkDebugReportCallbackEXT callbackHandle;
-  CALL_VK(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr,
-                                         &callbackHandle));
-  return true;
+    // Intend to keep the callback alive for the full Vulkan instance life cycle,
+    // not caching the returned callback handle, not calling
+    // vkDestroyDebugReportCallbackEXT either.
+    VkDebugReportCallbackEXT callbackHandle;
+    CALL_VK(vkCreateDebugReportCallbackEXT(instance, &dbgInfo, nullptr,
+                                           &callbackHandle));
+    return true;
+  }
+  return false;
 }

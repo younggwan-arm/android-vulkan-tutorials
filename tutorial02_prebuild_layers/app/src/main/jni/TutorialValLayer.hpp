@@ -57,6 +57,15 @@ class LayerAndExtensions {
   const char* const* getExtensionNames(ExtensionType type, void* handle);
   bool isExtensionSupported(const char* extName, ExtensionType type, void* handle);
 
+  /*
+   * Check for the supported debug report extension, could be:
+   *  - VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+   *  - VK_EXT_DEBUG_REPORT_EXTENSION_NAME
+   *  - nullptr (not supported)
+   *  With Validation layer release 1.2.176.1, the first 2 extension are implemented,
+   *  so VK_EXT_DEBUG_UTILS_EXTENSION_NAME should be returned.
+   */
+  const char*  getDbgReportExtName(void);
   bool hookDbgReportExt(VkInstance instance);
 
 
