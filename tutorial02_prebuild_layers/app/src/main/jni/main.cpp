@@ -14,8 +14,10 @@
 
 #include <android/log.h>
 #include <android_native_app_glue.h>
+
 #include <cassert>
 #include <vector>
+
 #include "TutorialValLayer.hpp"
 #include "vulkan_wrapper.h"
 
@@ -84,16 +86,26 @@ bool initialize(android_app* app) {
       .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
 
-  // Enable validation and debug layer/extensions, together with other necessary extensions
+  // Enable validation and debug layer/extensions, together with other necessary
+  // extensions
   LayerAndExtensions layerUtil;
-  const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
-  const char* extensions[] = {"VK_EXT_debug_report", "VK_KHR_surface", "VK_KHR_android_surface"};
-  for (auto layerName: layers) {
-      assert(layerUtil.isLayerSupported(layerName));
+  std::vector<const char*> layers = {"VK_LAYER_KHRONOS_validation"};
+  std::vector<const char*> extensions = {"VK_KHR_surface", "VK_KHR_android_surface"};
+  for (auto layerName : layers) {
+    // check vulkan sees the layers packed inside this app's APK. layers could also be
+    // be pushed to Android with adb on command line, this sample does test that approach
+    // in the sense: if you want to use the adb way, you want to use it to enable/disable too
+    //               if you want to use the source code way, pack the layer into apk
+    //    blending different ways might work, feel free to use and experiment if you prefer.
+    assert(layerUtil.isLayerSupported(layerName));
   }
-  for(auto extName:extensions) {
-    assert(layerUtil.isExtensionSupported(extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
+  for (auto extName : extensions) {
+    assert(layerUtil.isExtensionSupported(
+        extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
   }
+  const char* dbgExtName = layerUtil.getDbgReportExtName();
+  if(dbgExtName)
+    extensions.push_back(dbgExtName);
 
   // Create Vulkan instance, requesting all enabled layers / extensions
   // available on the system
@@ -101,10 +113,10 @@ bool initialize(android_app* app) {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledLayerCount = sizeof(layers)/sizeof(layers[0]),
-      .ppEnabledLayerNames = layers,
-      .enabledExtensionCount = sizeof(extensions)/sizeof(extensions[0]),
-      .ppEnabledExtensionNames = extensions,
+      .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+      .ppEnabledLayerNames = layers.data(),
+      .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+      .ppEnabledExtensionNames = extensions.data(),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
@@ -162,16 +174,18 @@ bool initialize(android_app* app) {
 
   // Find a GFX queue family
   uint32_t queueFamilyCount;
-  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount,
+                                           nullptr);
   assert(queueFamilyCount);
-  std::vector<VkQueueFamilyProperties>  queueFamilyProperties(queueFamilyCount);
+  std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(tutorialGpu, &queueFamilyCount,
                                            queueFamilyProperties.data());
 
   uint32_t queueFamilyIndex;
-  for (queueFamilyIndex=0; queueFamilyIndex < queueFamilyCount;
+  for (queueFamilyIndex = 0; queueFamilyIndex < queueFamilyCount;
        queueFamilyIndex++) {
-    if (queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    if (queueFamilyProperties[queueFamilyIndex].queueFlags &
+        VK_QUEUE_GRAPHICS_BIT) {
       break;
     }
   }
@@ -188,8 +202,9 @@ bool initialize(android_app* app) {
       .queueFamilyIndex = queueFamilyIndex,
       .queueCount = 1,
       // Send nullptr for queue priority, instead of the priority array
-      // so debug extension could catch the bug and call back app's debug function
-      .pQueuePriorities = nullptr, // priorities,
+      // so debug extension could catch the bug and call back app's debug
+      // function
+      .pQueuePriorities = nullptr,  // priorities,
   };
 
   VkDeviceCreateInfo deviceCreateInfo{

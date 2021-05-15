@@ -6,7 +6,8 @@ include_directories(${APP_GLUE_DIR})
 add_library( app-glue STATIC ${APP_GLUE_DIR}/android_native_app_glue.c)
 
 # build vulkan app
-set(VK_WRAPPER_DIR ../../../../../common/vulkan_wrapper)
+set(COMMON_DIR ../../../../../common)
+set(VK_WRAPPER_DIR ${COMMON_DIR}/vulkan_wrapper)
 set(VK_VAL_LAYER_SRC_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src)
 
 add_library(vktuts SHARED
