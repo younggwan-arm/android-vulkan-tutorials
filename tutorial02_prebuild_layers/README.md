@@ -24,6 +24,9 @@ In logcat, you would see the error message like:
 ```
 E/Vulkan-Debug-Message:: Validation -- Validation Error: [ VUID-VkDeviceQueueCreateInfo-pQueuePriorities-parameter ] Object 0: VK_NULL_HANDLE, type = VK_OBJECT_TYPE_DEVICE; | MessageID = 0xd6d720c6 | vkCreateDevice: required parameter pCreateInfo->pQueueCreateInfos[0].pQueuePriorities specified as NULL. The Vulkan spec states: pQueuePriorities must be a valid pointer to an array of queueCount float values (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-VkDeviceQueueCreateInfo-pQueuePriorities-parameter)
 ```
-
+## Additional References
+- [Validation layer history][3]
 [1]:https://github.com/KhronosGroup/Vulkan-ValidationLayers/releases/latest
 [2]:https://github.com/googlesamples/android-vulkan-tutorials/blob/master/tutorial02_prebuild_layers/app/src/main/jni/main.cpp#L190
+[3]:https://www.lunarg.com/wp-content/uploads/2019/04/UberLayer_V3.pdf
+

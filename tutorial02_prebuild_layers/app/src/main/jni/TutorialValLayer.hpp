@@ -18,13 +18,7 @@
 #include <map>
 #include <vector>
 
-/**
- * an enum to indicate request for vkInstance or vkPhysicalDevice
- */
-enum class ExtensionType {
-    LAYER_EXTENSION,
-    DEVICE_EXTENSION,
-};
+#define VULKAN_DRIVER "VulkanDriver"
 
 /** A Helper class to manage validation layers and extensions
  * Supposed usage:
@@ -46,26 +40,44 @@ class LayerAndExtensions {
   const char* const* getLayerNames(void);
   bool isLayerSupported(const char* name);
 
-  uint32_t getExtensionCount(ExtensionType type, void* handle);
-  /**
-   * getExtensionNames(): return the extension names.
-   *     The memory holding the names is valid
-   *     as long as the object is not deleted.
-   * @param handle a valid VkPhysicalDevice, or VK_NULL_HANDLE if this is for layer extensions
-   * @return an array of strings for extension names.
+  /*
+   * getExtensionCount()
+   *  handle: VK_NULL_HANDLE when asking for instance extensions
+   *          valid VkPhysicalDevice handle for device extensions
    */
-  const char* const* getExtensionNames(ExtensionType type, void* handle);
-  bool isExtensionSupported(const char* extName, ExtensionType type, void* handle);
+  uint32_t getExtensionCount(void* handle);
+  /*
+   * getExtensionNames(): return the extension names.
+   * @param names holding returned extension names.
+   * @param handle a valid VkPhysicalDevice, or VK_NULL_HANDLE if this is for layer extensions
+   * @return true for extension returned, false otherwise.
+   */
+  bool getExtensionNames(std::vector<const char*>& names, void* handle);
+  /*
+   * isExtensionSupported(): get layer which implements give extension
+   * @param extName an extension name in question
+   * @param handle valid VKPhysicalDevice handle if asking for device extension in
+   *               vulkan driver/implicit layers; VK_NULL_HANDLE if asks for instance extensions.
+   * @param layerName memory to hold for the layer name that implements the requested extension.
+   *        name could be used to enable the layer when app creating vulkan instance.
+   *        Note: if the extension is supported in vulkan driver or implicitly loaded layers,
+   *              string VULKAN_DRIVER is return in layerName.
+   */
+  bool isExtensionSupported(const char* extName, void* handle, const char** layerName);
 
   /*
-   * Check for the supported debug report extension, could be:
+   * Check for the supported debug report extension and its hosting layers, could be:
    *  - VK_EXT_DEBUG_UTILS_EXTENSION_NAME
    *  - VK_EXT_DEBUG_REPORT_EXTENSION_NAME
    *  - nullptr (not supported)
    *  With Validation layer release 1.2.176.1, the first 2 extension are implemented,
    *  so VK_EXT_DEBUG_UTILS_EXTENSION_NAME should be returned.
+   * Return:
+   *   std::pair<layerName, extName>
+   *   if debug layer is implemented in driver(not in any layers), string VULKAN_DRIVER is
+   *   returned as layerName, please make a note of it(as there is no layer named VULKAN_DRIVER).
    */
-  const char*  getDbgReportExtName(void);
+  std::pair<const char*, const char*> getDbgReportExtInfo(void);
   bool hookDbgReportExt(VkInstance instance);
 
 
@@ -84,8 +96,10 @@ class LayerAndExtensions {
   VkInstance instance_;
   VkDebugReportCallbackEXT vkCallbackHandle_;
 
-  std::map<void*, std::vector<char*>> layersCache_;
-  std::map<void*, std::vector<char*>> extCache_;
+  // Global layers and extensions
+  std::map<void*, std::vector<char*>> layerNames_;
+  // device extension with form: physicalDevice:layer:extensions
+  std::map<void*, std::map<std::string, std::vector<const char*>>> extensions_;
 
   // helper functions
   void initDevExtensions(void*);

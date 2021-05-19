@@ -89,29 +89,48 @@ bool initialize(android_app* app) {
   // Enable validation and debug layer/extensions, together with other necessary
   // extensions
   LayerAndExtensions layerUtil;
-  const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
-  const char* extensions[] = {"VK_EXT_debug_report", "VK_KHR_surface",
-                              "VK_KHR_android_surface"};
+  std::vector<const char *> layers = {"VK_LAYER_KHRONOS_validation"};
+  std::vector<const char*> extensions = {"VK_KHR_surface", "VK_KHR_android_surface"};
   for (auto layerName : layers) {
+    // check vulkan sees the layers packed inside this app's APK. layers could also be
+    // be pushed to Android with adb on command line, this sample does test that approach
+    // in the sense: if you want to use the adb way, you want to use it to enable/disable too
+    //               if you want to use the source code way, pack the layer into apk
+    //    blending different ways might work, feel free to use and experiment if you prefer.
     assert(layerUtil.isLayerSupported(layerName));
   }
   for (auto extName : extensions) {
     assert(layerUtil.isExtensionSupported(
-        extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
+        extName, VK_NULL_HANDLE, nullptr));
   }
-  // Create Vulkan instance, requesting all available layers & extensions on the
-  // system
+
+  // Find the supported debug callback extensions and its layers.
+  std::pair<const char*, const char*> dbgExt = layerUtil.getDbgReportExtInfo();
+  if(dbgExt.second) {
+    extensions.push_back(dbgExt.second);
+    if (strcmp(dbgExt.first, VULKAN_DRIVER)) {
+       bool alreadyIn = false;
+       for(auto& name : layers) {
+         if (!strcmp(name, dbgExt.first)) {
+           alreadyIn = true;
+           break;
+         }
+       }
+       if(!alreadyIn)
+         layers.push_back(dbgExt.first);
+    }
+  }
+
+  // Create Vulkan instance, requesting all enabled layers / extensions
+  // available on the system
   VkInstanceCreateInfo instanceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
       .pApplicationInfo = &appInfo,
-      .enabledLayerCount = layerUtil.getLayerCount(),
-      .ppEnabledLayerNames =
-          static_cast<const char* const*>(layerUtil.getLayerNames()),
-      .enabledExtensionCount = layerUtil.getExtensionCount(
-          ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
-      .ppEnabledExtensionNames = layerUtil.getExtensionNames(
-          ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE),
+      .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+      .ppEnabledLayerNames = layers.data(),
+      .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+      .ppEnabledExtensionNames = extensions.data(),
   };
   CALL_VK(vkCreateInstance(&instanceCreateInfo, nullptr, &tutorialInstance));
 
@@ -196,8 +215,9 @@ bool initialize(android_app* app) {
       .flags = 0,
       .queueFamilyIndex = queueFamilyIndex,
       .queueCount = 1,
-      // Send nullptr for queue priority so debug extension could
-      // catch the bug and call back app's debug function
+      // Send nullptr for queue priority, instead of the priority array
+      // so debug extension could catch the bug and call back app's debug
+      // function
       .pQueuePriorities = nullptr,  // priorities,
   };
 
@@ -206,15 +226,8 @@ bool initialize(android_app* app) {
       .pNext = nullptr,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &queueCreateInfo,
-      // Per Vulkan Spec, layers are the same for the instance and physical
-      // device we load them again(we do not have to) is for recommended
-      // backward compatibility purpose.
-      .enabledLayerCount = layerUtil.getLayerCount(),
-      .ppEnabledLayerNames = layerUtil.getLayerNames(),
-      .enabledExtensionCount = layerUtil.getExtensionCount(
-          ExtensionType::DEVICE_EXTENSION, tutorialGpu),
-      .ppEnabledExtensionNames = layerUtil.getExtensionNames(
-          ExtensionType::DEVICE_EXTENSION, tutorialGpu),
+      .enabledExtensionCount = 0,
+      .ppEnabledExtensionNames = nullptr,
       .pEnabledFeatures = nullptr,
   };
 

@@ -89,7 +89,7 @@ bool initialize(android_app* app) {
   // Enable validation and debug layer/extensions, together with other necessary
   // extensions
   LayerAndExtensions layerUtil;
-  std::vector<const char*> layers = {"VK_LAYER_KHRONOS_validation"};
+  std::vector<const char *> layers = {"VK_LAYER_KHRONOS_validation"};
   std::vector<const char*> extensions = {"VK_KHR_surface", "VK_KHR_android_surface"};
   for (auto layerName : layers) {
     // check vulkan sees the layers packed inside this app's APK. layers could also be
@@ -101,11 +101,25 @@ bool initialize(android_app* app) {
   }
   for (auto extName : extensions) {
     assert(layerUtil.isExtensionSupported(
-        extName, ExtensionType::LAYER_EXTENSION, VK_NULL_HANDLE));
+        extName, VK_NULL_HANDLE, nullptr));
   }
-  const char* dbgExtName = layerUtil.getDbgReportExtName();
-  if(dbgExtName)
-    extensions.push_back(dbgExtName);
+
+  // Find the supported debug callback extensions and its layers.
+  std::pair<const char*, const char*> dbgExt = layerUtil.getDbgReportExtInfo();
+  if(dbgExt.second) {
+    extensions.push_back(dbgExt.second);
+    if (strcmp(dbgExt.first, VULKAN_DRIVER)) {
+       bool alreadyIn = false;
+       for(auto& name : layers) {
+         if (!strcmp(name, dbgExt.first)) {
+           alreadyIn = true;
+           break;
+         }
+       }
+       if(!alreadyIn)
+         layers.push_back(dbgExt.first);
+    }
+  }
 
   // Create Vulkan instance, requesting all enabled layers / extensions
   // available on the system
@@ -132,7 +146,7 @@ bool initialize(android_app* app) {
   VkPhysicalDevice tmpGpus[gpuCount];
   CALL_VK(vkEnumeratePhysicalDevices(tutorialInstance, &gpuCount, tmpGpus));
   tutorialGpu = tmpGpus[0];  // Pick up the first GPU Device
-
+  
   // check for vulkan info on this GPU device
   VkPhysicalDeviceProperties gpuProperties;
   vkGetPhysicalDeviceProperties(tutorialGpu, &gpuProperties);
