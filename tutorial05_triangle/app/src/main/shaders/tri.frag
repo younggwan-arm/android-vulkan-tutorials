@@ -16,5 +16,11 @@
 #extension GL_ARB_shading_language_420pack : enable
 layout (location = 0) out vec4 uFragColor;
 void main() {
-   uFragColor = vec4(0.91, 0.26,  0.21, 1.0);
+   vec2 st = gl_FragCoord.xy/vec2(1000, 1000);
+   int index;
+   for (index = 0; index < 102400; index++)
+   {
+        st.x = st.x * st.x + 0.01;
+   }
+   uFragColor = vec4(st.x, st.y,  0.21, 1.0);
 }

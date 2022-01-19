@@ -16,10 +16,16 @@
 #include <vulkan_wrapper.h>
 
 #include <android/log.h>
+#include <android/sync.h>
 
 #include <cassert>
 #include <cstring>
 #include <vector>
+#include <array>
+#include <unistd.h>
+
+#define SCREEN_SPLITS 4
+#define MAX_SWAPCHAIN 3
 
 // Android log function wrappers
 static const char* kTAG = "Vulkan-Tutorial05";
@@ -79,18 +85,53 @@ struct VulkanGfxPipelineInfo {
 };
 VulkanGfxPipelineInfo gfxPipeline;
 
+struct PerFrame
+{
+    VkCommandBuffer cmdBuffers_[SCREEN_SPLITS];
+    VkSemaphore releaseSemaphores_[SCREEN_SPLITS];
+    int releasefds_[SCREEN_SPLITS];
+};
+
 struct VulkanRenderInfo {
   VkRenderPass renderPass_;
   VkCommandPool cmdPool_;
-  VkCommandBuffer* cmdBuffer_;
-  uint32_t cmdBufferLen_;
+  PerFrame perframe_[MAX_SWAPCHAIN];
   VkSemaphore semaphore_;
-  VkFence fence_;
 };
-VulkanRenderInfo render;
+VulkanRenderInfo render = {};
 
 // Android Native App pointer...
 android_app* androidAppCtx = nullptr;
+
+PFN_vkGetSemaphoreFdKHR vkGetSemaphoreFdKHR;
+PFN_vkImportSemaphoreFdKHR vkImportSemaphoreFdKHR;
+PFN_vkGetPhysicalDeviceExternalSemaphoreProperties vkGetPhysicalDeviceExternalSemaphoreProperties;
+
+int sync_wait(int fd, int timeout)
+{
+  struct pollfd fds;
+  int ret;
+  if (fd < 0) {
+    errno = EINVAL;
+    return -1;
+  }
+  fds.fd = fd;
+  fds.events = POLLIN;
+  do {
+    ret = poll(&fds, 1, timeout);
+    if (ret > 0) {
+      if (fds.revents & (POLLERR | POLLNVAL)) {
+        errno = EINVAL;
+        return -1;
+      }
+      return 0;
+    } else if (ret == 0) {
+      errno = ETIME;
+      return -1;
+    }
+  } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+  return ret;
+}
 
 /*
  * setImageLayout():
@@ -109,8 +150,9 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   instance_extensions.push_back("VK_KHR_surface");
   instance_extensions.push_back("VK_KHR_android_surface");
+  instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  instance_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 
-  device_extensions.push_back("VK_KHR_swapchain");
 
   // **********************************************************
   // Create the Vulkan instance
@@ -175,6 +217,10 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
       .queueCount = 1,
       .pQueuePriorities = priorities,
   };
+
+  device_extensions.push_back("VK_KHR_swapchain");
+  device_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+  device_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
 
   VkDeviceCreateInfo deviceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -588,6 +634,11 @@ VkResult CreateGraphicsPipeline(void) {
   CALL_VK(vkCreatePipelineCache(device.device_, &pipelineCacheInfo, nullptr,
                                 &gfxPipeline.cache_));
 
+  std::array<VkDynamicState, 1> dynamics{VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dynamic.pDynamicStates    = dynamics.data();
+  dynamic.dynamicStateCount = dynamics.size();
+
   // Create the pipeline
   VkGraphicsPipelineCreateInfo pipelineCreateInfo{
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -603,7 +654,7 @@ VkResult CreateGraphicsPipeline(void) {
       .pMultisampleState = &multisampleInfo,
       .pDepthStencilState = nullptr,
       .pColorBlendState = &colorBlendInfo,
-      .pDynamicState = nullptr,
+      .pDynamicState = &dynamic,
       .layout = gfxPipeline.layout_,
       .renderPass = render.renderPass_,
       .subpass = 0,
@@ -646,11 +697,43 @@ bool InitVulkan(android_app* app) {
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "tutorial",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-      .apiVersion = VK_MAKE_VERSION(1, 1, 0),
+      .apiVersion = VK_MAKE_VERSION(1, 2, 0),
   };
 
   // create a device
   CreateVulkanDevice(app->window, &appInfo);
+
+  vkGetSemaphoreFdKHR = reinterpret_cast<PFN_vkGetSemaphoreFdKHR>(
+          vkGetDeviceProcAddr(device.device_, "vkGetSemaphoreFdKHR"));
+  vkImportSemaphoreFdKHR = reinterpret_cast<PFN_vkImportSemaphoreFdKHR>(
+          vkGetDeviceProcAddr(device.device_, "vkImportSemaphoreFdKHR"));
+
+  vkGetPhysicalDeviceExternalSemaphoreProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceExternalSemaphoreProperties>(
+          vkGetInstanceProcAddr(device.instance_, "vkGetPhysicalDeviceExternalSemaphoreProperties"));
+
+  // Query supported info
+  VkPhysicalDeviceExternalSemaphoreInfo exSemInfo;
+  exSemInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO;
+  exSemInfo.pNext = nullptr;
+  exSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+
+  VkExternalSemaphoreProperties exSemProps;
+  exSemProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES;
+  exSemProps.pNext = nullptr;
+
+  vkGetPhysicalDeviceExternalSemaphoreProperties(device.gpuDevice_, &exSemInfo,
+                                                  &exSemProps);
+
+  if (!(exSemProps.exportFromImportedHandleTypes &
+                VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)) {
+    LOGE("HANDLE_TYPE_SYNC_FD not listed as exportFromImportedHandleTypes");
+    return false;
+  }
+  if (!(exSemProps.compatibleHandleTypes &
+                VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)) {
+    LOGE("HANDLE_TYPE_SYNC_FD not listed as compatibleHandleTypes");
+    return false;
+  }
 
   CreateSwapChain();
 
@@ -718,64 +801,74 @@ bool InitVulkan(android_app* app) {
   // Record a command buffer that just clear the screen
   // 1 command buffer draw in 1 framebuffer
   // In our case we need 2 command as we have 2 framebuffer
-  render.cmdBufferLen_ = swapchain.swapchainLength_;
-  render.cmdBuffer_ = new VkCommandBuffer[swapchain.swapchainLength_];
   VkCommandBufferAllocateInfo cmdBufferCreateInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext = nullptr,
       .commandPool = render.cmdPool_,
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = render.cmdBufferLen_,
+      .commandBufferCount = SCREEN_SPLITS,
   };
-  CALL_VK(vkAllocateCommandBuffers(device.device_, &cmdBufferCreateInfo,
-                                   render.cmdBuffer_));
 
-  for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
-       bufferIndex++) {
-    // We start by creating and declare the "beginning" our command buffer
-    VkCommandBufferBeginInfo cmdBufferBeginInfo{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .pInheritanceInfo = nullptr,
-    };
-    CALL_VK(vkBeginCommandBuffer(render.cmdBuffer_[bufferIndex],
-                                 &cmdBufferBeginInfo));
-    // transition the display image to color attachment layout
-    setImageLayout(render.cmdBuffer_[bufferIndex],
-                   swapchain.displayImages_[bufferIndex],
-                   VK_IMAGE_LAYOUT_UNDEFINED,
-                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+  for (uint32_t frame = 0; frame < swapchain.swapchainLength_; frame++) {
+    CALL_VK(vkAllocateCommandBuffers(device.device_, &cmdBufferCreateInfo,
+                                     render.perframe_[frame].cmdBuffers_));
+  }
 
-    // Now we start a renderpass. Any draw command has to be recorded in a
-    // renderpass
-    VkClearValue clearVals{ .color { .float32 {0.0f, 0.34f, 0.90f, 1.0f}}};
-    VkRenderPassBeginInfo renderPassBeginInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
-        .renderPass = render.renderPass_,
-        .framebuffer = swapchain.framebuffers_[bufferIndex],
-        .renderArea = {.offset { .x = 0, .y = 0,},
-                       .extent = swapchain.displaySize_},
-        .clearValueCount = 1,
-        .pClearValues = &clearVals};
-    vkCmdBeginRenderPass(render.cmdBuffer_[bufferIndex], &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
-    // Bind what is necessary to the command buffer
-    vkCmdBindPipeline(render.cmdBuffer_[bufferIndex],
-                      VK_PIPELINE_BIND_POINT_GRAPHICS, gfxPipeline.pipeline_);
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(render.cmdBuffer_[bufferIndex], 0, 1,
-                           &buffers.vertexBuf_, &offset);
+  for (int frameIndex = 0; frameIndex < swapchain.swapchainLength_; frameIndex++) {
+    for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+      // We start by creating and declare the "beginning" our command buffer
+      VkCommandBufferBeginInfo cmdBufferBeginInfo{
+              .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+              .pNext = nullptr,
+              .flags = 0,
+              .pInheritanceInfo = nullptr,
+      };
+      VkCommandBuffer cmdBuf = render.perframe_[frameIndex].cmdBuffers_[regionIndex];
+      CALL_VK(vkBeginCommandBuffer(cmdBuf,
+                                   &cmdBufferBeginInfo));
+      // transition the display image to color attachment layout
+      setImageLayout(cmdBuf,
+                     swapchain.displayImages_[frameIndex],
+                     VK_IMAGE_LAYOUT_UNDEFINED,
+                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                     VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    // Draw Triangle
-    vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
+      // Now we start a renderpass. Any draw command has to be recorded in a
+      // renderpass
+      VkClearValue clearVals{.color {.float32 {0.0f, 0.34f, 0.90f, 1.0f}}};
+      VkRenderPassBeginInfo renderPassBeginInfo{
+              .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+              .pNext = nullptr,
+              .renderPass = render.renderPass_,
+              .framebuffer = swapchain.framebuffers_[frameIndex],
+              .renderArea = {.offset {.x = 0, .y = 0,},
+                      .extent = swapchain.displaySize_},
+              .clearValueCount = 1,
+              .pClearValues = &clearVals};
+      vkCmdBeginRenderPass(cmdBuf, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+      // Bind what is necessary to the command buffer
+      vkCmdBindPipeline(cmdBuf,
+                        VK_PIPELINE_BIND_POINT_GRAPHICS, gfxPipeline.pipeline_);
+      VkDeviceSize offset = 0;
+      vkCmdBindVertexBuffers(cmdBuf, 0, 1,
+                             &buffers.vertexBuf_, &offset);
 
-    vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
+      VkRect2D scissor{};
+      scissor.extent.width = swapchain.displaySize_.width;
+      scissor.offset.y = static_cast<float>(swapchain.displaySize_.height / SCREEN_SPLITS * regionIndex);
+      scissor.extent.height = swapchain.displaySize_.height / SCREEN_SPLITS / (frameIndex + 1) - 1;
+      // Set scissor dynamically
+      vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
 
-    CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
+      // Draw Triangle
+      vkCmdDraw(cmdBuf, 3, 1, 0, 0);
+
+      vkCmdEndRenderPass(cmdBuf);
+
+      CALL_VK(vkEndCommandBuffer(cmdBuf));
+    }
   }
 
   // We need to create a fence to be able, in the main loop, to wait for our
@@ -785,8 +878,6 @@ bool InitVulkan(android_app* app) {
       .pNext = nullptr,
       .flags = 0,
   };
-  CALL_VK(
-      vkCreateFence(device.device_, &fenceCreateInfo, nullptr, &render.fence_));
 
   // We need to create a semaphore to be able to wait, in the main loop, for our
   // framebuffer to be available for us before drawing.
@@ -807,9 +898,10 @@ bool InitVulkan(android_app* app) {
 bool IsVulkanReady(void) { return device.initialized_; }
 
 void DeleteVulkan(void) {
-  vkFreeCommandBuffers(device.device_, render.cmdPool_, render.cmdBufferLen_,
-                       render.cmdBuffer_);
-  delete[] render.cmdBuffer_;
+  for (uint32_t frame = 0; swapchain.swapchainLength_; frame++) {
+    vkFreeCommandBuffers(device.device_, render.cmdPool_, SCREEN_SPLITS,
+                         render.perframe_->cmdBuffers_);
+  }
 
   vkDestroyCommandPool(device.device_, render.cmdPool_, nullptr);
   vkDestroyRenderPass(device.device_, render.renderPass_, nullptr);
@@ -830,23 +922,64 @@ bool VulkanDrawFrame(void) {
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
                                 &nextIndex));
-  CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
 
+  std::vector<VkSubmitInfo> submits;
   VkPipelineStageFlags waitStageMask =
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                              .pNext = nullptr,
-                              .waitSemaphoreCount = 1,
-                              .pWaitSemaphores = &render.semaphore_,
-                              .pWaitDstStageMask = &waitStageMask,
-                              .commandBufferCount = 1,
-                              .pCommandBuffers = &render.cmdBuffer_[nextIndex],
-                              .signalSemaphoreCount = 0,
-                              .pSignalSemaphores = nullptr};
-  CALL_VK(vkQueueSubmit(device.queue_, 1, &submit_info, render.fence_));
-  CALL_VK(
-      vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000));
+          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+  for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+      VkExportSemaphoreCreateInfo exportSemaphoreCreateInfo{
+              VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO, nullptr,
+              VkExternalSemaphoreHandleTypeFlags(
+                      VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)};
+
+      VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                                           &exportSemaphoreCreateInfo};
+      CALL_VK(vkCreateSemaphore(device.device_, &semaphore_info, nullptr,
+                                &render.perframe_[nextIndex].releaseSemaphores_[regionIndex]));
+  }
+
+  for (uint32_t regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+    VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 0,
+            .pWaitSemaphores = VK_NULL_HANDLE,
+            .pWaitDstStageMask = &waitStageMask,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &render.perframe_[nextIndex].cmdBuffers_[regionIndex],
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &render.perframe_[nextIndex].releaseSemaphores_[regionIndex]};
+
+    if (regionIndex == 0)
+    {
+      submit_info.pWaitSemaphores = &render.semaphore_;
+      submit_info.waitSemaphoreCount = 1;
+    }
+
+    submits.push_back(submit_info);
+  }
+
+  CALL_VK(vkQueueSubmit(device.queue_, SCREEN_SPLITS, submits.data(), VK_NULL_HANDLE));
+
+    for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+         VkSemaphoreGetFdInfoKHR semaphore_get_fd_info = {
+                VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
+        semaphore_get_fd_info.semaphore = render.perframe_[nextIndex].releaseSemaphores_[regionIndex];
+        semaphore_get_fd_info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+
+        CALL_VK(vkGetSemaphoreFdKHR(device.device_, &semaphore_get_fd_info,
+                                    &render.perframe_[nextIndex].releasefds_[regionIndex]));
+    }
+  __android_log_print(ANDROID_LOG_ERROR, "Tutorial ", "++++++ WAIT %d fd %d, %d %d %d", nextIndex,
+                      render.perframe_[nextIndex].releasefds_[0],
+                      render.perframe_[nextIndex].releasefds_[1],
+                      render.perframe_[nextIndex].releasefds_[2],
+                      render.perframe_[nextIndex].releasefds_[3]);
+  for (uint32_t regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+    sync_wait(render.perframe_[nextIndex].releasefds_[regionIndex], 100000);
+  }
+
+  __android_log_print(ANDROID_LOG_ERROR, "Tutorial ", "------ WAIT %d", nextIndex);
   LOGI("Drawing frames......");
 
   VkResult result;
@@ -861,6 +994,13 @@ bool VulkanDrawFrame(void) {
       .pResults = &result,
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
+  vkQueueWaitIdle(device.queue_);
+
+  for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
+      vkDestroySemaphore(device.device_,
+                         render.perframe_[nextIndex].releaseSemaphores_[regionIndex], nullptr);
+      //close(render.perframe_[nextIndex].releasefds_[regionIndex]);
+  }
   return true;
 }
 
