@@ -23,6 +23,7 @@
 #include <vector>
 #include <array>
 #include <unistd.h>
+#include <future>
 
 #define SCREEN_SPLITS 4
 #define MAX_SWAPCHAIN 3
@@ -89,6 +90,8 @@ struct PerFrame
 {
     VkCommandBuffer cmdBuffers_[SCREEN_SPLITS];
     VkSemaphore releaseSemaphores_[SCREEN_SPLITS];
+    VkSemaphore acquireSemaphore_;
+    std::atomic<uint32_t> timelineValue;
     int releasefds_[SCREEN_SPLITS];
 };
 
@@ -105,6 +108,10 @@ android_app* androidAppCtx = nullptr;
 
 PFN_vkGetSemaphoreFdKHR vkGetSemaphoreFdKHR;
 PFN_vkImportSemaphoreFdKHR vkImportSemaphoreFdKHR;
+
+PFN_vkSignalSemaphore vkSignalSemaphore;
+PFN_vkWaitSemaphores vkWaitSemaphores;
+
 PFN_vkGetPhysicalDeviceExternalSemaphoreProperties vkGetPhysicalDeviceExternalSemaphoreProperties;
 
 int sync_wait(int fd, int timeout)
@@ -152,7 +159,6 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   instance_extensions.push_back("VK_KHR_android_surface");
   instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
   instance_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
-
 
   // **********************************************************
   // Create the Vulkan instance
@@ -221,7 +227,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   device_extensions.push_back("VK_KHR_swapchain");
   device_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
   device_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-
+  device_extensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   VkDeviceCreateInfo deviceCreateInfo{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext = nullptr,
@@ -281,7 +287,7 @@ void CreateSwapChain(void) {
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .pNext = nullptr,
       .surface = device.surface_,
-      .minImageCount = surfaceCapabilities.minImageCount,
+      .minImageCount = MAX_SWAPCHAIN,//surfaceCapabilities.minImageCount,
       .imageFormat = formats[chosenFormat].format,
       .imageColorSpace = formats[chosenFormat].colorSpace,
       .imageExtent = surfaceCapabilities.currentExtent,
@@ -708,6 +714,11 @@ bool InitVulkan(android_app* app) {
   vkImportSemaphoreFdKHR = reinterpret_cast<PFN_vkImportSemaphoreFdKHR>(
           vkGetDeviceProcAddr(device.device_, "vkImportSemaphoreFdKHR"));
 
+  vkSignalSemaphore = reinterpret_cast<PFN_vkSignalSemaphore>(
+          vkGetDeviceProcAddr(device.device_, "vkSignalSemaphoreKHR"));
+  vkWaitSemaphores = reinterpret_cast<PFN_vkWaitSemaphores>(
+          vkGetDeviceProcAddr(device.device_, "vkWaitSemaphoresKHR"));
+
   vkGetPhysicalDeviceExternalSemaphoreProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceExternalSemaphoreProperties>(
           vkGetInstanceProcAddr(device.instance_, "vkGetPhysicalDeviceExternalSemaphoreProperties"));
 
@@ -742,7 +753,7 @@ bool InitVulkan(android_app* app) {
   VkAttachmentDescription attachmentDescriptions{
       .format = swapchain.displayFormat_,
       .samples = VK_SAMPLE_COUNT_1_BIT,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
       .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
       .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -915,6 +926,19 @@ void DeleteVulkan(void) {
   device.initialized_ = false;
 }
 
+void computeProcess(int fd, VkSemaphore timelineSemaphore, std::atomic<uint32_t>* timelineValue)
+{
+  sync_wait(fd, -1);
+  __android_log_print(ANDROID_LOG_ERROR, "Tutorial ", "Signaled fd %d",fd);
+  VkSemaphoreSignalInfo signalInfo;
+  signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+  signalInfo.pNext = NULL;
+  signalInfo.semaphore = timelineSemaphore;
+  signalInfo.value = ++(*timelineValue);
+
+  CALL_VK(vkSignalSemaphore(device.device_, &signalInfo));
+}
+
 // Draw one frame
 bool VulkanDrawFrame(void) {
   uint32_t nextIndex;
@@ -922,10 +946,6 @@ bool VulkanDrawFrame(void) {
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
                                 &nextIndex));
-
-  std::vector<VkSubmitInfo> submits;
-  VkPipelineStageFlags waitStageMask =
-          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
   for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
       VkExportSemaphoreCreateInfo exportSemaphoreCreateInfo{
@@ -939,22 +959,35 @@ bool VulkanDrawFrame(void) {
                                 &render.perframe_[nextIndex].releaseSemaphores_[regionIndex]));
   }
 
+  VkSemaphoreTypeCreateInfo timelineCreateInfo;
+  timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+  timelineCreateInfo.pNext = NULL;
+  timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  timelineCreateInfo.initialValue = 0;
+
+  VkSemaphoreCreateInfo timelineSemaphoreCreateInfo;
+  timelineSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  timelineSemaphoreCreateInfo.pNext = &timelineCreateInfo;
+  timelineSemaphoreCreateInfo.flags = 0;
+  CALL_VK(vkCreateSemaphore(device.device_, &timelineSemaphoreCreateInfo, nullptr,
+                            &render.perframe_[nextIndex].acquireSemaphore_));
+
+  render.perframe_[nextIndex].timelineValue = 0;
+
+  std::vector<VkSubmitInfo> submits;
+  VkPipelineStageFlags waitStageMask =
+          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
   for (uint32_t regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
     VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .pNext = nullptr,
-            .waitSemaphoreCount = 0,
-            .pWaitSemaphores = VK_NULL_HANDLE,
+            .waitSemaphoreCount = (regionIndex == 0) ? 1u : 0u,
+            .pWaitSemaphores = (regionIndex == 0) ? &render.semaphore_: VK_NULL_HANDLE,
             .pWaitDstStageMask = &waitStageMask,
             .commandBufferCount = 1,
             .pCommandBuffers = &render.perframe_[nextIndex].cmdBuffers_[regionIndex],
             .signalSemaphoreCount = 1,
             .pSignalSemaphores = &render.perframe_[nextIndex].releaseSemaphores_[regionIndex]};
-
-    if (regionIndex == 0)
-    {
-      submit_info.pWaitSemaphores = &render.semaphore_;
-      submit_info.waitSemaphoreCount = 1;
-    }
 
     submits.push_back(submit_info);
   }
@@ -975,9 +1008,26 @@ bool VulkanDrawFrame(void) {
                       render.perframe_[nextIndex].releasefds_[1],
                       render.perframe_[nextIndex].releasefds_[2],
                       render.perframe_[nextIndex].releasefds_[3]);
+
+  std::vector<std::future<void>> computeTasks;
   for (uint32_t regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
-    sync_wait(render.perframe_[nextIndex].releasefds_[regionIndex], 100000);
+    computeTasks.push_back(std::async(std::launch::async, computeProcess,
+                                      render.perframe_[nextIndex].releasefds_[regionIndex],
+                                      render.perframe_[nextIndex].acquireSemaphore_,
+                                      &render.perframe_[nextIndex].timelineValue));
   }
+
+  const uint64_t waitValue = SCREEN_SPLITS;
+
+  VkSemaphoreWaitInfo waitInfo;
+  waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+  waitInfo.pNext = NULL;
+  waitInfo.flags = 0;
+  waitInfo.semaphoreCount = 1;
+  waitInfo.pSemaphores = &render.perframe_[nextIndex].acquireSemaphore_;
+  waitInfo.pValues = &waitValue;
+
+  vkWaitSemaphores(device.device_, &waitInfo, UINT64_MAX);
 
   __android_log_print(ANDROID_LOG_ERROR, "Tutorial ", "------ WAIT %d", nextIndex);
   LOGI("Drawing frames......");
@@ -999,8 +1049,10 @@ bool VulkanDrawFrame(void) {
   for (int regionIndex = 0; regionIndex < SCREEN_SPLITS; regionIndex++) {
       vkDestroySemaphore(device.device_,
                          render.perframe_[nextIndex].releaseSemaphores_[regionIndex], nullptr);
-      //close(render.perframe_[nextIndex].releasefds_[regionIndex]);
+      close(render.perframe_[nextIndex].releasefds_[regionIndex]);
   }
+
+  vkDestroySemaphore(device.device_, render.perframe_[nextIndex].acquireSemaphore_, nullptr);
   return true;
 }
 
